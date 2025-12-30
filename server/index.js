@@ -798,7 +798,7 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log('※PCとスマホが同じWi-Fiに接続されている必要があります');
   console.log('');
   console.log('=== テストアカウント ===');
-  console.log('管理者: admin@example.com / admin123');
-  console.log('一般ユーザー: tanaka@example.com / password123');
+  console.log('管理者: 管理者 / 1234');
+  console.log('一般ユーザー: 田中太郎 / 5678');
   console.log('====================');
 });

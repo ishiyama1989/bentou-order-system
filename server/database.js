@@ -103,26 +103,26 @@ db.serialize(() => {
       // サンプルユーザー（管理者）
       db.run(`
         INSERT INTO users (name, email, password, delivery_location, role)
-        VALUES ('管理者', 'admin@example.com', 'admin123', '乗務員区', 'admin')
+        VALUES ('管理者', 'admin@example.com', '1234', '乗務員区', 'admin')
       `, (err) => {
         if (err) {
           console.error('管理者挿入エラー:', err);
         } else {
-          console.log('✓ 管理者アカウント作成: 管理者 / admin123');
+          console.log('✓ 管理者アカウント作成: 管理者 / 1234');
         }
       });
 
       // サンプルユーザー（一般）
       db.run(`
         INSERT INTO users (name, email, password, delivery_location, role)
-        VALUES ('田中太郎', 'tanaka@example.com', 'password123', '大月駅', 'user')
+        VALUES ('田中太郎', 'tanaka@example.com', '5678', '大月駅', 'user')
       `, (err) => {
         if (err) console.error('田中太郎挿入エラー:', err);
       });
 
       db.run(`
         INSERT INTO users (name, email, password, delivery_location, role)
-        VALUES ('佐藤花子', 'sato@example.com', 'password123', '富士山駅', 'user')
+        VALUES ('佐藤花子', 'sato@example.com', '9012', '富士山駅', 'user')
       `, (err) => {
         if (err) console.error('佐藤花子挿入エラー:', err);
       });

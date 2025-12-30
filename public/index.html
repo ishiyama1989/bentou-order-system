@@ -27,15 +27,15 @@
               <input type="text" id="login-name" required placeholder="山田太郎">
             </div>
             <div class="form-group">
-              <label>パスワード</label>
-              <input type="password" id="login-password" required placeholder="パスワード">
+              <label>パスワード（4桁）</label>
+              <input type="password" id="login-password" required placeholder="4桁の数字" pattern="[0-9]{4}" maxlength="4" inputmode="numeric">
             </div>
             <button type="submit" class="btn btn-primary">ログイン</button>
           </form>
           <div class="test-accounts">
             <p><strong>テストアカウント:</strong></p>
-            <p>管理者: 管理者 / admin123</p>
-            <p>一般: 田中太郎 / password123</p>
+            <p>管理者: 管理者 / 1234</p>
+            <p>一般: 田中太郎 / 5678</p>
           </div>
         </div>
 
@@ -48,8 +48,8 @@
               <input type="text" id="register-name" required placeholder="山田太郎">
             </div>
             <div class="form-group">
-              <label>パスワード</label>
-              <input type="password" id="register-password" required placeholder="パスワード（6文字以上）" minlength="6">
+              <label>パスワード（4桁）</label>
+              <input type="password" id="register-password" required placeholder="4桁の数字" pattern="[0-9]{4}" maxlength="4" inputmode="numeric">
             </div>
             <div class="form-group">
               <label>所属</label>

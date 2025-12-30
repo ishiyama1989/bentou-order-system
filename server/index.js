@@ -54,19 +54,29 @@ app.use(express.static(path.join(__dirname, '..', 'public')));
 app.post('/api/login', (req, res) => {
   const { name, email, password } = req.body;
 
+  console.log('ログイン試行:', { name, email, password: password ? '****' : 'なし' });
+
   // 名前またはメールアドレスでログインを許可
   const loginField = name || email;
+
+  if (!loginField || !password) {
+    console.log('ログイン失敗: 入力値が不足');
+    return res.status(400).json({ error: '名前とパスワードを入力してください' });
+  }
 
   db.get(
     'SELECT * FROM users WHERE (name = ? OR email = ?) AND password = ?',
     [loginField, loginField, password],
     (err, user) => {
       if (err) {
+        console.error('ログインDBエラー:', err);
         return res.status(500).json({ error: 'データベースエラー' });
       }
       if (!user) {
+        console.log('ログイン失敗: ユーザーが見つかりません', { loginField });
         return res.status(401).json({ error: '名前またはパスワードが間違っています' });
       }
+      console.log('ログイン成功:', user.name);
       res.json({ user: { id: user.id, name: user.name, email: user.email, delivery_location: user.delivery_location, role: user.role } });
     }
   );

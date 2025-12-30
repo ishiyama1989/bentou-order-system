@@ -180,25 +180,42 @@ async function loadTodayOrder() {
     const weekday = weekdays[now.getDay()];
     const formattedDate = `${now.getMonth() + 1}月${now.getDate()}日（${weekday}）`;
 
-    todayOrderDiv.innerHTML = `
-      <div class="card today-order-card">
-        <h3>${formattedDate}の注文</h3>
-        <div class="today-order-content">
-          <div class="quantity-selector-large">
-            <label>数量：</label>
-            <select id="today-quantity" class="quantity-select-large">
-              <option value="0" ${!isOrdered || todayOrder?.quantity === 0 ? 'selected' : ''}>注文しない</option>
-              <option value="1" ${todayOrder?.quantity === 1 ? 'selected' : ''}>1個</option>
-              <option value="2" ${todayOrder?.quantity === 2 ? 'selected' : ''}>2個</option>
-              <option value="3" ${todayOrder?.quantity === 3 ? 'selected' : ''}>3個</option>
-              <option value="4" ${todayOrder?.quantity === 4 ? 'selected' : ''}>4個</option>
-              <option value="5" ${todayOrder?.quantity === 5 ? 'selected' : ''}>5個</option>
-            </select>
+    // 既に注文済みの場合はキャンセル画面を表示
+    if (isOrdered) {
+      todayOrderDiv.innerHTML = `
+        <div class="card today-order-card">
+          <h3>${formattedDate}の注文</h3>
+          <div class="alert alert-success" style="margin: 20px 0; padding: 20px; background: #d4edda; border: 1px solid #c3e6cb; border-radius: 8px;">
+            <p style="text-align: center; font-size: 18px; margin: 0; color: #155724;">
+              ✓ 注文済み: ${todayOrder.quantity}個
+            </p>
           </div>
-          <button class="btn btn-primary btn-large" onclick="submitTodayOrder()">注文する</button>
+          <div class="today-order-content">
+            <button class="btn btn-danger btn-large" onclick="cancelTodayOrder()">注文をキャンセル</button>
+          </div>
         </div>
-      </div>
-    `;
+      `;
+    } else {
+      // 未注文の場合は注文フォームを表示
+      todayOrderDiv.innerHTML = `
+        <div class="card today-order-card">
+          <h3>${formattedDate}の注文</h3>
+          <div class="today-order-content">
+            <div class="quantity-selector-large">
+              <label>数量：</label>
+              <select id="today-quantity" class="quantity-select-large">
+                <option value="1" selected>1個</option>
+                <option value="2">2個</option>
+                <option value="3">3個</option>
+                <option value="4">4個</option>
+                <option value="5">5個</option>
+              </select>
+            </div>
+            <button class="btn btn-primary btn-large" onclick="submitTodayOrder()">注文する</button>
+          </div>
+        </div>
+      `;
+    }
   } catch (error) {
     console.error('Error loading today order:', error);
   }
@@ -226,18 +243,52 @@ window.submitTodayOrder = async function() {
     const data = await response.json();
 
     if (response.ok) {
-      if (quantity === 0) {
-        alert('本日の注文をキャンセルしました');
-      } else {
-        alert(`本日の注文を受け付けました！（${quantity}個）`);
-      }
+      alert(`本日の注文を受け付けました！（${quantity}個）`);
       await loadOrderHistory();
+      await loadTodayOrder(); // 当日注文画面を更新
     } else {
       alert(data.error || '注文に失敗しました');
     }
   } catch (error) {
     console.error('Order error:', error);
     alert('注文エラーが発生しました');
+  }
+};
+
+// 当日注文のキャンセル
+window.cancelTodayOrder = async function() {
+  if (!confirm('本日の注文をキャンセルしますか？')) {
+    return;
+  }
+
+  const today = new Date().toISOString().split('T')[0];
+
+  try {
+    const menuId = 1;
+
+    const response = await fetch(`${API_BASE}/orders`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        user_id: currentUser.id,
+        menu_id: menuId,
+        order_date: today,
+        quantity: 0  // 数量0でキャンセル
+      })
+    });
+
+    const data = await response.json();
+
+    if (response.ok) {
+      alert('本日の注文をキャンセルしました');
+      await loadOrderHistory();
+      await loadTodayOrder(); // 当日注文画面を更新
+    } else {
+      alert(data.error || 'キャンセルに失敗しました');
+    }
+  } catch (error) {
+    console.error('Cancel error:', error);
+    alert('キャンセルエラーが発生しました');
   }
 };
 

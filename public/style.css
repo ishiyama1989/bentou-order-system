@@ -304,108 +304,102 @@ table tbody tr:hover {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(-45deg, #ee7752, #e73c7e, #23a6d5, #23d5ab);
-  background-size: 400% 400%;
-  animation: gradientShift 15s ease infinite;
-  position: relative;
-  overflow: hidden;
-}
-
-/* アニメーショングラデーション */
-@keyframes gradientShift {
-  0% {
-    background-position: 0% 50%;
-  }
-  50% {
-    background-position: 100% 50%;
-  }
-  100% {
-    background-position: 0% 50%;
-  }
-}
-
-/* 装飾的な円 */
-#login-screen::before {
-  content: '';
-  position: absolute;
-  width: 500px;
-  height: 500px;
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 50%;
-  top: -250px;
-  right: -250px;
-  animation: float 20s ease-in-out infinite;
-}
-
-#login-screen::after {
-  content: '';
-  position: absolute;
-  width: 400px;
-  height: 400px;
-  background: rgba(255, 255, 255, 0.08);
-  border-radius: 50%;
-  bottom: -200px;
-  left: -200px;
-  animation: float 25s ease-in-out infinite reverse;
-}
-
-@keyframes float {
-  0%, 100% {
-    transform: translate(0, 0) rotate(0deg);
-  }
-  50% {
-    transform: translate(50px, 50px) rotate(180deg);
-  }
+  background: #f8f9fa;
+  min-height: 100vh;
 }
 
 #login-screen .container {
-  max-width: 400px;
-  position: relative;
-  z-index: 1;
+  max-width: 420px;
+  width: 100%;
+  padding: 40px 20px;
 }
 
 #login-screen h1 {
   text-align: center;
-  color: white;
-  margin-bottom: 30px;
-  font-size: 32px;
-  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
-  font-weight: 700;
-  letter-spacing: 1px;
+  color: #2c3e50;
+  margin-bottom: 40px;
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: -0.5px;
 }
 
-/* ログインカードのグラスモーフィズム効果 */
+/* ログインカード */
 #login-screen .card {
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  background: white;
+  border: none;
+  box-shadow: 0 2px 20px rgba(0, 0, 0, 0.08);
+  border-radius: 12px;
+  padding: 35px;
 }
 
-/* ログイン画面のタブスタイル */
+/* ログイン画面のタブ */
 #login-screen .tabs {
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 8px;
-  padding: 5px;
+  background: #f1f3f5;
+  border-radius: 10px;
+  padding: 4px;
   border-bottom: none;
+  margin-bottom: 30px;
 }
 
 #login-screen .tab-btn {
-  border-radius: 6px;
-  color: rgba(255, 255, 255, 0.8);
+  border-radius: 8px;
+  color: #6c757d;
   border-bottom: none;
-  transition: all 0.3s ease;
+  padding: 12px 20px;
+  font-weight: 500;
+  transition: all 0.2s ease;
 }
 
 #login-screen .tab-btn.active {
-  background: rgba(255, 255, 255, 0.95);
-  color: #3498db;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  background: white;
+  color: #2c3e50;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 #login-screen .tab-btn:hover {
-  background: rgba(255, 255, 255, 0.3);
-  color: white;
+  background: white;
+  color: #2c3e50;
+}
+
+/* フォームスタイル */
+#login-screen .form-group {
+  margin-bottom: 20px;
+}
+
+#login-screen .form-group label {
+  display: block;
+  margin-bottom: 8px;
+  color: #495057;
+  font-weight: 500;
+  font-size: 14px;
+}
+
+#login-screen input[type="text"],
+#login-screen input[type="password"],
+#login-screen select {
+  width: 100%;
+  padding: 12px 16px;
+  border: 2px solid #e9ecef;
+  border-radius: 8px;
+  font-size: 15px;
+  transition: all 0.2s ease;
+}
+
+#login-screen input[type="text"]:focus,
+#login-screen input[type="password"]:focus,
+#login-screen select:focus {
+  outline: none;
+  border-color: #3498db;
+  box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+}
+
+#login-screen .btn {
+  width: 100%;
+  padding: 14px;
+  font-size: 16px;
+  font-weight: 600;
+  border-radius: 8px;
+  margin-top: 10px;
 }
 
 .test-accounts {

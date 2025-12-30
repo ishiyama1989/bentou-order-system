@@ -85,6 +85,16 @@ db.serialize(() => {
     )
   `);
 
+  // 注文不可日テーブル
+  db.run(`
+    CREATE TABLE IF NOT EXISTS unavailable_dates (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      unavailable_date DATE NOT NULL UNIQUE,
+      reason TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
   // サンプルデータ挿入（管理者ユーザーの存在を確認）
   db.get("SELECT * FROM users WHERE email = 'admin@example.com'", (err, admin) => {
     if (err) {
@@ -112,19 +122,83 @@ db.serialize(() => {
         }
       });
 
-      // サンプルユーザー（一般）
+      // サンプルユーザー（一般） - 各所属2名ずつ
+
+      // 乗務員区
       db.run(`
         INSERT INTO users (name, email, password, delivery_location, role)
-        VALUES ('田中太郎', 'tanaka@example.com', '5678', '大月駅', 'user')
+        VALUES ('山田一郎', 'yamada@example.com', '1111', '乗務員区', 'user')
+      `, (err) => {
+        if (err) console.error('山田一郎挿入エラー:', err);
+        else console.log('✓ 山田一郎 / 1111 (乗務員区)');
+      });
+
+      // 運転指令
+      db.run(`
+        INSERT INTO users (name, email, password, delivery_location, role)
+        VALUES ('田中太郎', 'tanaka@example.com', '5678', '運転指令', 'user')
       `, (err) => {
         if (err) console.error('田中太郎挿入エラー:', err);
+        else console.log('✓ 田中太郎 / 5678 (運転指令)');
       });
 
       db.run(`
         INSERT INTO users (name, email, password, delivery_location, role)
-        VALUES ('佐藤花子', 'sato@example.com', '9012', '富士山駅', 'user')
+        VALUES ('鈴木次郎', 'suzuki@example.com', '2222', '運転指令', 'user')
+      `, (err) => {
+        if (err) console.error('鈴木次郎挿入エラー:', err);
+        else console.log('✓ 鈴木次郎 / 2222 (運転指令)');
+      });
+
+      // 管理駅
+      db.run(`
+        INSERT INTO users (name, email, password, delivery_location, role)
+        VALUES ('高橋三郎', 'takahashi@example.com', '3333', '管理駅', 'user')
+      `, (err) => {
+        if (err) console.error('高橋三郎挿入エラー:', err);
+        else console.log('✓ 高橋三郎 / 3333 (管理駅)');
+      });
+
+      db.run(`
+        INSERT INTO users (name, email, password, delivery_location, role)
+        VALUES ('伊藤四郎', 'ito@example.com', '4444', '管理駅', 'user')
+      `, (err) => {
+        if (err) console.error('伊藤四郎挿入エラー:', err);
+        else console.log('✓ 伊藤四郎 / 4444 (管理駅)');
+      });
+
+      // 索道
+      db.run(`
+        INSERT INTO users (name, email, password, delivery_location, role)
+        VALUES ('渡辺五郎', 'watanabe@example.com', '5555', '索道', 'user')
+      `, (err) => {
+        if (err) console.error('渡辺五郎挿入エラー:', err);
+        else console.log('✓ 渡辺五郎 / 5555 (索道)');
+      });
+
+      db.run(`
+        INSERT INTO users (name, email, password, delivery_location, role)
+        VALUES ('中村六郎', 'nakamura@example.com', '6666', '索道', 'user')
+      `, (err) => {
+        if (err) console.error('中村六郎挿入エラー:', err);
+        else console.log('✓ 中村六郎 / 6666 (索道)');
+      });
+
+      // 技術所
+      db.run(`
+        INSERT INTO users (name, email, password, delivery_location, role)
+        VALUES ('佐藤花子', 'sato@example.com', '9012', '技術所', 'user')
       `, (err) => {
         if (err) console.error('佐藤花子挿入エラー:', err);
+        else console.log('✓ 佐藤花子 / 9012 (技術所)');
+      });
+
+      db.run(`
+        INSERT INTO users (name, email, password, delivery_location, role)
+        VALUES ('小林七郎', 'kobayashi@example.com', '7777', '技術所', 'user')
+      `, (err) => {
+        if (err) console.error('小林七郎挿入エラー:', err);
+        else console.log('✓ 小林七郎 / 7777 (技術所)');
       });
 
       // サンプルメニュー（日替わり弁当のみ）

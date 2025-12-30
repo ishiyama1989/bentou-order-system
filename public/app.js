@@ -4,6 +4,7 @@ const API_BASE = window.location.hostname === 'localhost'
   : '/api';
 
 let currentUser = null;
+let allUnavailableDates = []; // 全注文不可日
 
 // ログイン/登録タブ切り替え
 window.switchLoginTab = function(tab) {
@@ -43,6 +44,14 @@ function setupTabs() {
 
       btn.classList.add('active');
       parent.querySelector(`#${tabName}-tab`).classList.remove('hidden');
+
+      // メニュー管理タブが開かれた場合、カレンダーを初期化
+      if (tabName === 'admin-menus') {
+        // カレンダーがまだ読み込まれていない場合のみ読み込む
+        if (unavailableMonthSelect && unavailableMonthSelect.value) {
+          loadUnavailableCalendar();
+        }
+      }
     });
   });
 }
@@ -137,6 +146,9 @@ async function showUserScreen() {
   showScreen('user-screen');
   document.getElementById('user-info').textContent = `${currentUser.name} (${currentUser.delivery_location})`;
 
+  // 注文不可日を読み込み
+  await loadAllUnavailableDates();
+
   // 当日注文を読み込み
   await loadTodayOrder();
 
@@ -146,14 +158,49 @@ async function showUserScreen() {
   await loadOrderHistory();
 }
 
+// 全注文不可日を取得
+async function loadAllUnavailableDates() {
+  try {
+    const response = await fetch(`${API_BASE}/admin/unavailable-dates`);
+    allUnavailableDates = await response.json();
+  } catch (error) {
+    console.error('Error loading unavailable dates:', error);
+    allUnavailableDates = [];
+  }
+}
+
+// 指定日が注文不可日かチェック
+function isUnavailableDate(dateStr) {
+  return allUnavailableDates.some(d => d.unavailable_date === dateStr);
+}
+
 // 当日注文の読み込み
 async function loadTodayOrder() {
   try {
     const now = new Date();
     const currentHour = now.getHours();
-    const today = now.toISOString().split('T')[0];
+    // タイムゾーンを考慮した今日の日付を取得
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const today = `${year}-${month}-${day}`;
 
     const todayOrderDiv = document.getElementById('today-order');
+
+    // 今日が注文不可日かチェック
+    if (isUnavailableDate(today)) {
+      todayOrderDiv.innerHTML = `
+        <div class="card">
+          <div class="alert alert-error">
+            <p style="text-align: center; font-size: 16px; margin: 20px 0;">
+              本日は注文できません<br>
+              明日以降の注文は「予約注文」タブからお願いします。
+            </p>
+          </div>
+        </div>
+      `;
+      return;
+    }
 
     // 8時を過ぎている場合
     if (currentHour >= 8) {
@@ -243,7 +290,13 @@ async function loadTodayOrder() {
 window.submitTodayOrder = async function() {
   const quantity = parseInt(document.getElementById('today-quantity').value);
   const deliveryLocation = document.getElementById('today-delivery-location').value;
-  const today = new Date().toISOString().split('T')[0];
+
+  // タイムゾーンを考慮した今日の日付を取得
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  const today = `${year}-${month}-${day}`;
 
   try {
     const menuId = 1;
@@ -281,7 +334,12 @@ window.cancelTodayOrder = async function() {
     return;
   }
 
-  const today = new Date().toISOString().split('T')[0];
+  // タイムゾーンを考慮した今日の日付を取得
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  const today = `${year}-${month}-${day}`;
 
   try {
     const menuId = 1;
@@ -341,6 +399,37 @@ function initMonthSelector() {
   loadMonthlyMenus(months[0].year, months[0].month);
 }
 
+// 予約注文の月を変更
+window.changeOrderMonth = function(delta) {
+  const select = document.getElementById('order-month-select');
+  if (!select || !select.value) return;
+
+  const [currentYear, currentMonth] = select.value.split('-').map(Number);
+  const currentDate = new Date(currentYear, currentMonth - 1, 1);
+
+  // 新しい月を計算
+  currentDate.setMonth(currentDate.getMonth() + delta);
+  const newYear = currentDate.getFullYear();
+  const newMonth = currentDate.getMonth() + 1;
+
+  // 範囲チェック（今月から2ヶ月先まで）
+  const now = new Date();
+  const minDate = new Date(now.getFullYear(), now.getMonth(), 1);
+  const maxDate = new Date(now.getFullYear(), now.getMonth() + 2, 1);
+  const newDate = new Date(newYear, newMonth - 1, 1);
+
+  if (newDate < minDate || newDate > maxDate) {
+    return; // 範囲外なら何もしない
+  }
+
+  // 新しい値を設定
+  const newValue = `${newYear}-${newMonth}`;
+  select.value = newValue;
+
+  // メニューを再読み込み
+  loadMonthlyMenus(newYear, newMonth);
+};
+
 // 月別メニュー読み込み（1日〜31日をカレンダー形式で表示）
 async function loadMonthlyMenus(year, month) {
   try {
@@ -387,7 +476,10 @@ async function loadMonthlyMenus(year, month) {
       const weekday = weekdays[date.getDay()];
 
       // 注文可能期間チェック
-      const isAvailable = date >= cutoffDate && date <= maxDate;
+      const isInDateRange = date >= cutoffDate && date <= maxDate;
+      const isUnavailable = isUnavailableDate(dateStr);
+      const isAvailable = isInDateRange && !isUnavailable;
+
       const existingOrder = orderMap[dateStr];
       const existingQty = existingOrder ? existingOrder.quantity : 0;
       const existingLocation = existingOrder ? existingOrder.deliveryLocation : '';
@@ -395,7 +487,16 @@ async function loadMonthlyMenus(year, month) {
       // ボタンのラベルとスタイルを決定
       const hasOrder = existingQty > 0;
 
-      if (isAvailable) {
+      if (isUnavailable && isInDateRange) {
+        // 注文不可日の表示
+        rows.push(`
+          <tr class="disabled-row">
+            <td>${day}日</td>
+            <td>${weekday}</td>
+            <td colspan="3" style="text-align: center; color: #e74c3c; font-weight: bold;">注文不可</td>
+          </tr>
+        `);
+      } else if (isAvailable) {
         if (hasOrder) {
           // 予約済み：表示のみ（キャンセルボタン付き）
           rows.push(`
@@ -726,8 +827,12 @@ async function showAdminScreen() {
   showScreen('admin-screen');
   document.getElementById('admin-info').textContent = `${currentUser.name} (管理者)`;
 
-  // 今日の日付をデフォルトに設定
-  const today = new Date().toISOString().split('T')[0];
+  // 今日の日付をデフォルトに設定（タイムゾーンを考慮）
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  const today = `${year}-${month}-${day}`;
   document.getElementById('admin-daily-date').value = today;
 
   // 本日の注文を読み込み
@@ -777,6 +882,33 @@ async function showAdminScreen() {
   // 初回の配達場所リストをロード
   await loadDeliveryLocations(today);
 }
+
+// 本日の注文の日付を変更
+window.changeDailyDate = async function(delta) {
+  const input = document.getElementById('admin-daily-date');
+  if (!input || !input.value) return;
+
+  // 日付文字列をパースして、年月日を取得
+  const [year, month, day] = input.value.split('-').map(Number);
+
+  // Date オブジェクトを作成（ローカルタイムゾーン）
+  const currentDate = new Date(year, month - 1, day);
+
+  // 日付を変更
+  currentDate.setDate(currentDate.getDate() + delta);
+
+  // YYYY-MM-DD 形式で取得
+  const newYear = currentDate.getFullYear();
+  const newMonth = String(currentDate.getMonth() + 1).padStart(2, '0');
+  const newDay = String(currentDate.getDate()).padStart(2, '0');
+  const newValue = `${newYear}-${newMonth}-${newDay}`;
+
+  input.value = newValue;
+
+  // 注文データを再読み込み
+  await loadDailyOrders(newValue);
+  await loadDeliveryLocations(newValue);
+};
 
 // 配達場所リスト読み込み
 async function loadDeliveryLocations(date) {
@@ -940,36 +1072,170 @@ document.getElementById('monthly-summary-btn').addEventListener('click', async (
       return;
     }
 
-    summaryDiv.innerHTML = `
-      <table>
-        <thead>
+    // 所属ごとにグループ化
+    const groupedByLocation = {};
+    summary.forEach(item => {
+      const location = item.delivery_location || '未設定';
+      if (!groupedByLocation[location]) {
+        groupedByLocation[location] = [];
+      }
+      groupedByLocation[location].push(item);
+    });
+
+    // 全体の合計を計算
+    let grandTotalOrders = 0;
+    let grandTotalQuantity = 0;
+    let grandTotalAmount = 0;
+    let grandTotalSubsidy = 0;
+    let grandTotalBurden = 0;
+
+    // 所属ごとのテーブルを生成
+    let tablesHTML = '';
+    Object.keys(groupedByLocation).sort().forEach(location => {
+      const items = groupedByLocation[location];
+
+      // 所属ごとの小計を計算
+      let locationTotalOrders = 0;
+      let locationTotalQuantity = 0;
+      let locationTotalAmount = 0;
+      let locationTotalSubsidy = 0;
+      let locationTotalBurden = 0;
+
+      const rowsHTML = items.map(item => {
+        const subsidy = item.order_count * 100;
+        const personalBurden = item.total_amount - subsidy;
+
+        locationTotalOrders += item.order_count;
+        locationTotalQuantity += item.total_quantity;
+        locationTotalAmount += item.total_amount;
+        locationTotalSubsidy += subsidy;
+        locationTotalBurden += personalBurden;
+
+        return `
           <tr>
-            <th style="text-align: center;">従業員</th>
-            <th style="text-align: center;">注文回数</th>
-            <th style="text-align: center;">合計個数</th>
-            <th style="text-align: center;">合計金額</th>
-            <th style="text-align: center;">補助</th>
-            <th style="text-align: center;">負担金額</th>
+            <td style="text-align: center;">${item.user_name}</td>
+            <td style="text-align: center;">${item.order_count}回</td>
+            <td style="text-align: center;">${item.total_quantity}個</td>
+            <td style="text-align: center;">¥${item.total_amount.toLocaleString()}</td>
+            <td style="text-align: center;">¥${subsidy.toLocaleString()}</td>
+            <td style="text-align: center;">¥${personalBurden.toLocaleString()}</td>
           </tr>
-        </thead>
-        <tbody>
-          ${summary.map(item => {
-            const subsidy = item.order_count * 100;
-            const personalBurden = item.total_amount - subsidy;
-            return `
+        `;
+      }).join('');
+
+      // 全体の合計に加算
+      grandTotalOrders += locationTotalOrders;
+      grandTotalQuantity += locationTotalQuantity;
+      grandTotalAmount += locationTotalAmount;
+      grandTotalSubsidy += locationTotalSubsidy;
+      grandTotalBurden += locationTotalBurden;
+
+      // 各所属のテーブル
+      tablesHTML += `
+        <div class="card" style="margin-bottom: 20px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 2px solid #3498db; padding-bottom: 8px;">
+            <h3 style="margin: 0; color: #2c3e50;">${location}</h3>
+            <div style="display: flex; gap: 8px;">
+              <button class="btn btn-success btn-sm export-location-csv" data-location="${location}" style="font-size: 12px; padding: 5px 10px;">CSV</button>
+              <button class="btn btn-success btn-sm export-location-excel" data-location="${location}" style="font-size: 12px; padding: 5px 10px;">Excel</button>
+            </div>
+          </div>
+          <table>
+            <thead>
               <tr>
-                <td style="text-align: center;">${item.user_name}</td>
-                <td style="text-align: center;">${item.order_count}回</td>
-                <td style="text-align: center;">${item.total_quantity}個</td>
-                <td style="text-align: center;">¥${item.total_amount.toLocaleString()}</td>
-                <td style="text-align: center;">¥${subsidy.toLocaleString()}</td>
-                <td style="text-align: center;">¥${personalBurden.toLocaleString()}</td>
+                <th style="text-align: center;">従業員</th>
+                <th style="text-align: center;">注文回数</th>
+                <th style="text-align: center;">合計個数</th>
+                <th style="text-align: center;">合計金額</th>
+                <th style="text-align: center;">補助</th>
+                <th style="text-align: center;">負担金額</th>
               </tr>
-            `;
-          }).join('')}
-        </tbody>
-      </table>
+            </thead>
+            <tbody>
+              ${rowsHTML}
+              <tr style="background-color: #ecf0f1; font-weight: 600;">
+                <td style="text-align: center;">小計</td>
+                <td style="text-align: center;">${locationTotalOrders}回</td>
+                <td style="text-align: center;">${locationTotalQuantity}個</td>
+                <td style="text-align: center;">¥${locationTotalAmount.toLocaleString()}</td>
+                <td style="text-align: center;">¥${locationTotalSubsidy.toLocaleString()}</td>
+                <td style="text-align: center;">¥${locationTotalBurden.toLocaleString()}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      `;
+    });
+
+    // 全体の合計テーブル
+    const grandTotalHTML = `
+      <div class="card" style="background-color: #e8f4f8; border: 2px solid #3498db;">
+        <h3 style="margin-bottom: 15px; color: #2c3e50;">全体合計</h3>
+        <table>
+          <thead>
+            <tr>
+              <th style="text-align: center;">項目</th>
+              <th style="text-align: center;">注文回数</th>
+              <th style="text-align: center;">合計個数</th>
+              <th style="text-align: center;">合計金額</th>
+              <th style="text-align: center;">補助</th>
+              <th style="text-align: center;">負担金額</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="font-weight: 700; font-size: 16px;">
+              <td style="text-align: center;">合計</td>
+              <td style="text-align: center;">${grandTotalOrders}回</td>
+              <td style="text-align: center;">${grandTotalQuantity}個</td>
+              <td style="text-align: center;">¥${grandTotalAmount.toLocaleString()}</td>
+              <td style="text-align: center;">¥${grandTotalSubsidy.toLocaleString()}</td>
+              <td style="text-align: center;">¥${grandTotalBurden.toLocaleString()}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     `;
+
+    // 全所属まとめて出力ボタン
+    const combinedExportHTML = `
+      <div class="export-buttons" style="margin: 20px 0; padding: 15px; background-color: #f8f9fa; border-radius: 8px;">
+        <h3 style="margin-bottom: 10px; font-size: 16px; color: #2c3e50;">全所属まとめて出力</h3>
+        <div style="display: flex; gap: 10px;">
+          <button id="export-csv-combined" class="btn btn-success" style="flex: 1;">CSV出力</button>
+          <button id="export-excel-combined" class="btn btn-success" style="flex: 1;">Excel出力</button>
+        </div>
+      </div>
+    `;
+
+    summaryDiv.innerHTML = combinedExportHTML + tablesHTML + grandTotalHTML;
+
+    // 全所属まとめて出力ボタンのイベントリスナー
+    document.getElementById('export-csv-combined').addEventListener('click', () => {
+      window.open(`${API_BASE}/orders/export/monthly-csv-combined?year=${year}&month=${month}`, '_blank');
+    });
+
+    document.getElementById('export-excel-combined').addEventListener('click', () => {
+      window.open(`${API_BASE}/orders/export/monthly-excel-combined?year=${year}&month=${month}`, '_blank');
+    });
+
+    // 動的に追加された所属ごとのエクスポートボタンにイベントリスナーを設定
+    document.querySelectorAll('.export-location-csv').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const location = e.target.getAttribute('data-location');
+        const year = document.getElementById('monthly-year').value;
+        const month = document.getElementById('monthly-month').value;
+        window.open(`${API_BASE}/orders/export/monthly-csv-single?year=${year}&month=${month}&location=${encodeURIComponent(location)}`, '_blank');
+      });
+    });
+
+    document.querySelectorAll('.export-location-excel').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const location = e.target.getAttribute('data-location');
+        const year = document.getElementById('monthly-year').value;
+        const month = document.getElementById('monthly-month').value;
+        window.open(`${API_BASE}/orders/export/monthly-excel-single?year=${year}&month=${month}&location=${encodeURIComponent(location)}`, '_blank');
+      });
+    });
   } catch (error) {
     console.error('Error loading monthly summary:', error);
   }
@@ -1061,6 +1327,32 @@ async function handleMonthlyImageFiles(files) {
   }
 }
 
+// 月別画像月選択のデフォルト値を設定
+const monthlyImageMonthInput = document.getElementById('monthly-image-month');
+if (monthlyImageMonthInput) {
+  const now = new Date();
+  const defaultMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  monthlyImageMonthInput.value = defaultMonth;
+}
+
+// 月別画像の月を変更
+window.changeMonthlyImageMonth = function(delta) {
+  const input = document.getElementById('monthly-image-month');
+  if (!input || !input.value) return;
+
+  const [currentYear, currentMonth] = input.value.split('-').map(Number);
+  const currentDate = new Date(currentYear, currentMonth - 1, 1);
+
+  // 新しい月を計算
+  currentDate.setMonth(currentDate.getMonth() + delta);
+  const newYear = currentDate.getFullYear();
+  const newMonth = currentDate.getMonth() + 1;
+
+  // 新しい値を設定
+  const newValue = `${newYear}-${String(newMonth).padStart(2, '0')}`;
+  input.value = newValue;
+};
+
 // 月別画像設定
 document.getElementById('set-monthly-image-form').addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -1107,7 +1399,12 @@ document.getElementById('set-monthly-image-form').addEventListener('submit', asy
 document.getElementById('add-menu-form').addEventListener('submit', async (e) => {
   e.preventDefault();
 
-  const today = new Date().toISOString().split('T')[0];
+  // タイムゾーンを考慮した今日の日付を取得
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  const today = `${year}-${month}-${day}`;
 
   const menuData = {
     name: document.getElementById('menu-name').value,
@@ -1203,6 +1500,225 @@ async function loadAllMenus() {
     console.error('Error loading all menus:', error);
   }
 }
+
+// =========== 注文不可日カレンダー ===========
+
+// 注文不可日の配列
+let unavailableDates = [];
+// 選択中の日付の配列
+let selectedDates = [];
+
+// 月選択の初期化
+const unavailableMonthSelect = document.getElementById('unavailable-month-select');
+if (unavailableMonthSelect) {
+  // デフォルトは今月
+  const now = new Date();
+  const defaultMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  unavailableMonthSelect.value = defaultMonth;
+
+  // 月変更時にカレンダーを更新
+  unavailableMonthSelect.addEventListener('change', async () => {
+    await loadUnavailableCalendar();
+  });
+}
+
+// 注文不可日設定の月を変更
+window.changeUnavailableMonth = function(delta) {
+  if (!unavailableMonthSelect || !unavailableMonthSelect.value) return;
+
+  const [currentYear, currentMonth] = unavailableMonthSelect.value.split('-').map(Number);
+  const currentDate = new Date(currentYear, currentMonth - 1, 1);
+
+  // 新しい月を計算
+  currentDate.setMonth(currentDate.getMonth() + delta);
+  const newYear = currentDate.getFullYear();
+  const newMonth = currentDate.getMonth() + 1;
+
+  // 新しい値を設定
+  const newValue = `${newYear}-${String(newMonth).padStart(2, '0')}`;
+  unavailableMonthSelect.value = newValue;
+
+  // 選択をクリア
+  selectedDates = [];
+
+  // カレンダーを再読み込み
+  loadUnavailableCalendar();
+};
+
+// カレンダーを読み込む
+async function loadUnavailableCalendar() {
+  const monthValue = unavailableMonthSelect.value;
+  if (!monthValue) return;
+
+  const [year, month] = monthValue.split('-');
+
+  try {
+    // その月の注文不可日を取得
+    const response = await fetch(`${API_BASE}/admin/unavailable-dates/${year}/${month}`);
+    unavailableDates = await response.json();
+
+    // カレンダーを描画
+    renderCalendar(parseInt(year), parseInt(month));
+  } catch (error) {
+    console.error('Error loading unavailable dates:', error);
+  }
+}
+
+// カレンダーを描画
+function renderCalendar(year, month) {
+  const calendarDiv = document.getElementById('unavailable-calendar');
+
+  // その月の1日
+  const firstDay = new Date(year, month - 1, 1);
+  // その月の最終日
+  const lastDay = new Date(year, month, 0);
+  const daysInMonth = lastDay.getDate();
+
+  // 1日が何曜日か（0=日曜, 1=月曜, ...）
+  const firstDayOfWeek = firstDay.getDay();
+
+  // 今日の日付
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  let html = '<div class="calendar-grid">';
+
+  // 曜日ヘッダー
+  const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
+  weekdays.forEach(day => {
+    html += `<div class="calendar-day-header">${day}</div>`;
+  });
+
+  // 空白セル（月初めまで）
+  for (let i = 0; i < firstDayOfWeek; i++) {
+    html += '<div class="calendar-day empty"></div>';
+  }
+
+  // 日付セル
+  for (let day = 1; day <= daysInMonth; day++) {
+    const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    const currentDate = new Date(year, month - 1, day);
+
+    // 過去の日付かチェック
+    const isPast = currentDate < today;
+
+    // 注文不可日かチェック
+    const isUnavailable = unavailableDates.some(d => d.unavailable_date === dateStr);
+
+    // 選択中かチェック
+    const isSelected = selectedDates.includes(dateStr);
+
+    let classes = 'calendar-day';
+    if (isPast) {
+      classes += ' past';
+    } else if (isSelected) {
+      classes += ' selected';
+    } else if (isUnavailable) {
+      classes += ' unavailable';
+    }
+
+    html += `<div class="${classes}" data-date="${dateStr}" onclick="selectDate('${dateStr}', ${isPast})">${day}</div>`;
+  }
+
+  html += '</div>';
+
+  // 凡例と設定ボタン
+  html += `
+    <div class="calendar-legend">
+      <div class="calendar-legend-item">
+        <div class="calendar-legend-box available"></div>
+        <span>注文可能</span>
+      </div>
+      <div class="calendar-legend-item">
+        <div class="calendar-legend-box" style="background: #cfe2ff; border-color: #3498db;"></div>
+        <span>選択中</span>
+      </div>
+      <div class="calendar-legend-item">
+        <div class="calendar-legend-box unavailable"></div>
+        <span>注文不可</span>
+      </div>
+    </div>
+    <div style="margin-top: 20px; text-align: center;">
+      <button class="btn btn-success" onclick="applyUnavailableDates()" style="min-width: 200px;">設定を適用</button>
+      <button class="btn btn-secondary" onclick="clearSelection()" style="min-width: 200px; margin-left: 10px;">選択をクリア</button>
+    </div>
+  `;
+
+  calendarDiv.innerHTML = html;
+}
+
+// 日付を選択
+window.selectDate = function(dateStr, isPast) {
+  // 過去の日付は選択不可
+  if (isPast) {
+    alert('過去の日付は変更できません');
+    return;
+  }
+
+  // 既に選択されている場合は選択解除
+  const index = selectedDates.indexOf(dateStr);
+  if (index > -1) {
+    selectedDates.splice(index, 1);
+  } else {
+    // 選択されていない場合は選択
+    selectedDates.push(dateStr);
+  }
+
+  // カレンダーを再描画
+  const monthValue = unavailableMonthSelect.value;
+  const [year, month] = monthValue.split('-');
+  renderCalendar(parseInt(year), parseInt(month));
+};
+
+// 選択をクリア
+window.clearSelection = function() {
+  selectedDates = [];
+  const monthValue = unavailableMonthSelect.value;
+  const [year, month] = monthValue.split('-');
+  renderCalendar(parseInt(year), parseInt(month));
+};
+
+// 設定を適用
+window.applyUnavailableDates = async function() {
+  if (selectedDates.length === 0) {
+    alert('日付が選択されていません');
+    return;
+  }
+
+  try {
+    // 各選択された日付に対して処理
+    const promises = selectedDates.map(async (dateStr) => {
+      const isCurrentlyUnavailable = unavailableDates.some(d => d.unavailable_date === dateStr);
+
+      if (isCurrentlyUnavailable) {
+        // 注文不可日を削除（注文可能に戻す）
+        return fetch(`${API_BASE}/admin/unavailable-dates/${dateStr}`, {
+          method: 'DELETE'
+        });
+      } else {
+        // 注文不可日に設定
+        return fetch(`${API_BASE}/admin/unavailable-dates`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ date: dateStr, reason: null })
+        });
+      }
+    });
+
+    await Promise.all(promises);
+
+    // 選択をクリア
+    selectedDates = [];
+
+    // カレンダーを再読み込み
+    await loadUnavailableCalendar();
+
+    alert('設定を適用しました');
+  } catch (error) {
+    console.error('Error applying unavailable dates:', error);
+    alert('エラーが発生しました');
+  }
+};
 
 // 初期化
 setupTabs();

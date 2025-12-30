@@ -6,6 +6,8 @@ const path = require('path');
 const multer = require('multer');
 const fs = require('fs');
 const PDFDocument = require('pdfkit');
+const xlsx = require('xlsx');
+const archiver = require('archiver');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -93,8 +95,9 @@ app.post('/api/users/register', (req, res) => {
     return res.status(400).json({ error: '全ての項目を入力してください' });
   }
 
-  if (password.length < 6) {
-    return res.status(400).json({ error: 'パスワードは6文字以上にしてください' });
+  // パスワードは4桁の数字のみ
+  if (!/^\d{4}$/.test(password)) {
+    return res.status(400).json({ error: 'パスワードは4桁の数字で入力してください' });
   }
 
   // 名前の重複チェック
@@ -374,12 +377,12 @@ app.get('/api/orders/daily/:date', (req, res) => {
   const { date } = req.params;
 
   db.all(
-    `SELECT o.*, u.name as user_name, u.delivery_location, m.name as menu_name, m.price
+    `SELECT o.*, u.name as user_name, o.delivery_location, m.name as menu_name, m.price
      FROM orders o
      JOIN users u ON o.user_id = u.id
      JOIN menus m ON o.menu_id = m.id
      WHERE o.order_date = ?
-     ORDER BY u.delivery_location, u.name`,
+     ORDER BY o.delivery_location, u.name`,
     [date],
     (err, orders) => {
       if (err) {
@@ -624,7 +627,7 @@ app.get('/api/orders/pdf/:date/:location', (req, res) => {
 
   // 特定配達場所の注文を取得
   db.all(
-    `SELECT o.*, u.name as user_name, u.delivery_location, m.name as menu_name, m.price
+    `SELECT o.*, u.name as user_name, o.delivery_location, m.name as menu_name, m.price
      FROM orders o
      JOIN users u ON o.user_id = u.id
      JOIN menus m ON o.menu_id = m.id
@@ -769,6 +772,602 @@ app.get('/api/monthly-images/:year/:month', (req, res) => {
         return res.status(500).json({ error: 'データベースエラー' });
       }
       res.json(image || null);
+    }
+  );
+});
+
+// =========== 注文不可日API ===========
+
+// 全注文不可日取得
+app.get('/api/admin/unavailable-dates', (req, res) => {
+  db.all(
+    'SELECT * FROM unavailable_dates ORDER BY unavailable_date',
+    (err, dates) => {
+      if (err) {
+        return res.status(500).json({ error: 'データベースエラー' });
+      }
+      res.json(dates);
+    }
+  );
+});
+
+// 特定月の注文不可日取得
+app.get('/api/admin/unavailable-dates/:year/:month', (req, res) => {
+  const { year, month } = req.params;
+  const startDate = `${year}-${month.padStart(2, '0')}-01`;
+
+  // 月末を計算
+  const nextMonth = parseInt(month) === 12 ? 1 : parseInt(month) + 1;
+  const nextYear = parseInt(month) === 12 ? parseInt(year) + 1 : parseInt(year);
+  const endDate = `${nextYear}-${String(nextMonth).padStart(2, '0')}-01`;
+
+  db.all(
+    'SELECT * FROM unavailable_dates WHERE unavailable_date >= ? AND unavailable_date < ? ORDER BY unavailable_date',
+    [startDate, endDate],
+    (err, dates) => {
+      if (err) {
+        return res.status(500).json({ error: 'データベースエラー' });
+      }
+      res.json(dates);
+    }
+  );
+});
+
+// 注文不可日追加
+app.post('/api/admin/unavailable-dates', (req, res) => {
+  const { date, reason } = req.body;
+
+  if (!date) {
+    return res.status(400).json({ error: '日付を指定してください' });
+  }
+
+  db.run(
+    'INSERT INTO unavailable_dates (unavailable_date, reason) VALUES (?, ?)',
+    [date, reason || null],
+    function(err) {
+      if (err) {
+        if (err.message.includes('UNIQUE constraint failed')) {
+          return res.status(400).json({ error: 'この日付は既に登録されています' });
+        }
+        return res.status(500).json({ error: 'データベースエラー' });
+      }
+      res.json({ id: this.lastID, message: '注文不可日を追加しました' });
+    }
+  );
+});
+
+// 注文不可日削除
+app.delete('/api/admin/unavailable-dates/:date', (req, res) => {
+  const { date } = req.params;
+
+  db.run(
+    'DELETE FROM unavailable_dates WHERE unavailable_date = ?',
+    [date],
+    function(err) {
+      if (err) {
+        return res.status(500).json({ error: 'データベースエラー' });
+      }
+      if (this.changes === 0) {
+        return res.status(404).json({ error: '指定された日付が見つかりません' });
+      }
+      res.json({ message: '注文不可日を削除しました' });
+    }
+  );
+});
+
+// =========== エクスポートAPI ===========
+
+// 月次集計CSVエクスポート（単一所属）
+app.get('/api/orders/export/monthly-csv-single', (req, res) => {
+  const { year, month, location } = req.query;
+
+  // 集計期間計算
+  let startYear = parseInt(year);
+  let startMonth = parseInt(month) - 1;
+  if (startMonth < 1) {
+    startMonth = 12;
+    startYear -= 1;
+  }
+  const startDate = `${startYear}-${String(startMonth).padStart(2, '0')}-16`;
+  const endDate = `${year}-${month}-15`;
+
+  db.all(
+    `SELECT u.name as user_name, u.delivery_location, COUNT(o.id) as order_count, SUM(o.quantity) as total_quantity, SUM(m.price * o.quantity) as total_amount
+     FROM orders o
+     JOIN users u ON o.user_id = u.id
+     JOIN menus m ON o.menu_id = m.id
+     WHERE o.order_date >= ? AND o.order_date <= ? AND u.delivery_location = ?
+     GROUP BY u.id
+     ORDER BY u.name`,
+    [startDate, endDate, location],
+    (err, summary) => {
+      if (err) {
+        return res.status(500).json({ error: 'データベースエラー' });
+      }
+
+      // CSVヘッダー
+      let csv = '\uFEFF'; // BOM for Excel UTF-8
+      csv += '従業員,注文回数,合計個数,合計金額,補助,負担金額\n';
+
+      // 小計用の変数
+      let totalOrders = 0;
+      let totalQuantity = 0;
+      let totalAmount = 0;
+      let totalSubsidy = 0;
+      let totalBurden = 0;
+
+      // データ行
+      summary.forEach(item => {
+        const subsidy = item.order_count * 100;
+        const personalBurden = item.total_amount - subsidy;
+        csv += `${item.user_name},${item.order_count},${item.total_quantity},${item.total_amount},${subsidy},${personalBurden}\n`;
+
+        totalOrders += item.order_count;
+        totalQuantity += item.total_quantity;
+        totalAmount += item.total_amount;
+        totalSubsidy += subsidy;
+        totalBurden += personalBurden;
+      });
+
+      // 小計行
+      csv += `小計,${totalOrders},${totalQuantity},${totalAmount},${totalSubsidy},${totalBurden}\n`;
+
+      // レスポンス設定
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(location)}-${year}-${month}.csv"`);
+      res.send(csv);
+    }
+  );
+});
+
+// 月次集計Excelエクスポート（単一所属）
+app.get('/api/orders/export/monthly-excel-single', (req, res) => {
+  const { year, month, location } = req.query;
+
+  let startYear = parseInt(year);
+  let startMonth = parseInt(month) - 1;
+  if (startMonth < 1) {
+    startMonth = 12;
+    startYear -= 1;
+  }
+  const startDate = `${startYear}-${String(startMonth).padStart(2, '0')}-16`;
+  const endDate = `${year}-${month}-15`;
+
+  db.all(
+    `SELECT u.name as user_name, u.delivery_location, COUNT(o.id) as order_count, SUM(o.quantity) as total_quantity, SUM(m.price * o.quantity) as total_amount
+     FROM orders o
+     JOIN users u ON o.user_id = u.id
+     JOIN menus m ON o.menu_id = m.id
+     WHERE o.order_date >= ? AND o.order_date <= ? AND u.delivery_location = ?
+     GROUP BY u.id
+     ORDER BY u.name`,
+    [startDate, endDate, location],
+    (err, summary) => {
+      if (err) {
+        return res.status(500).json({ error: 'データベースエラー' });
+      }
+
+      const data = [
+        ['従業員', '注文回数', '合計個数', '合計金額', '補助', '負担金額']
+      ];
+
+      // 小計用の変数
+      let totalOrders = 0;
+      let totalQuantity = 0;
+      let totalAmount = 0;
+      let totalSubsidy = 0;
+      let totalBurden = 0;
+
+      summary.forEach(item => {
+        const subsidy = item.order_count * 100;
+        const personalBurden = item.total_amount - subsidy;
+        data.push([
+          item.user_name,
+          item.order_count,
+          item.total_quantity,
+          item.total_amount,
+          subsidy,
+          personalBurden
+        ]);
+
+        totalOrders += item.order_count;
+        totalQuantity += item.total_quantity;
+        totalAmount += item.total_amount;
+        totalSubsidy += subsidy;
+        totalBurden += personalBurden;
+      });
+
+      // 小計行
+      data.push([
+        '小計',
+        totalOrders,
+        totalQuantity,
+        totalAmount,
+        totalSubsidy,
+        totalBurden
+      ]);
+
+      const workbook = xlsx.utils.book_new();
+      const worksheet = xlsx.utils.aoa_to_sheet(data);
+      xlsx.utils.book_append_sheet(workbook, worksheet, location.substring(0, 31));
+
+      const excelBuffer = xlsx.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(location)}-${year}-${month}.xlsx"`);
+      res.send(excelBuffer);
+    }
+  );
+});
+
+// 月次集計CSVエクスポート（全所属まとめて）
+app.get('/api/orders/export/monthly-csv-combined', (req, res) => {
+  const { year, month } = req.query;
+
+  // 集計期間計算
+  let startYear = parseInt(year);
+  let startMonth = parseInt(month) - 1;
+  if (startMonth < 1) {
+    startMonth = 12;
+    startYear -= 1;
+  }
+  const startDate = `${startYear}-${String(startMonth).padStart(2, '0')}-16`;
+  const endDate = `${year}-${month}-15`;
+
+  db.all(
+    `SELECT u.name as user_name, u.delivery_location, COUNT(o.id) as order_count, SUM(o.quantity) as total_quantity, SUM(m.price * o.quantity) as total_amount
+     FROM orders o
+     JOIN users u ON o.user_id = u.id
+     JOIN menus m ON o.menu_id = m.id
+     WHERE o.order_date >= ? AND o.order_date <= ?
+     GROUP BY u.id
+     ORDER BY u.delivery_location, u.name`,
+    [startDate, endDate],
+    (err, summary) => {
+      if (err) {
+        return res.status(500).json({ error: 'データベースエラー' });
+      }
+
+      // CSVヘッダー
+      let csv = '\uFEFF'; // BOM for Excel UTF-8
+      csv += '所属,従業員,注文回数,合計個数,合計金額,補助,負担金額\n';
+
+      // 所属ごとにグループ化
+      const groupedByLocation = {};
+      summary.forEach(item => {
+        const location = item.delivery_location || '未設定';
+        if (!groupedByLocation[location]) {
+          groupedByLocation[location] = [];
+        }
+        groupedByLocation[location].push(item);
+      });
+
+      // 全体合計用の変数
+      let grandTotalOrders = 0;
+      let grandTotalQuantity = 0;
+      let grandTotalAmount = 0;
+      let grandTotalSubsidy = 0;
+      let grandTotalBurden = 0;
+
+      // 所属ごとにデータ行と小計を出力
+      Object.keys(groupedByLocation).sort().forEach(location => {
+        const items = groupedByLocation[location];
+        let locationTotalOrders = 0;
+        let locationTotalQuantity = 0;
+        let locationTotalAmount = 0;
+        let locationTotalSubsidy = 0;
+        let locationTotalBurden = 0;
+
+        items.forEach(item => {
+          const subsidy = item.order_count * 100;
+          const personalBurden = item.total_amount - subsidy;
+          csv += `${location},${item.user_name},${item.order_count},${item.total_quantity},${item.total_amount},${subsidy},${personalBurden}\n`;
+
+          locationTotalOrders += item.order_count;
+          locationTotalQuantity += item.total_quantity;
+          locationTotalAmount += item.total_amount;
+          locationTotalSubsidy += subsidy;
+          locationTotalBurden += personalBurden;
+        });
+
+        // 所属ごとの小計行
+        csv += `${location},小計,${locationTotalOrders},${locationTotalQuantity},${locationTotalAmount},${locationTotalSubsidy},${locationTotalBurden}\n`;
+
+        grandTotalOrders += locationTotalOrders;
+        grandTotalQuantity += locationTotalQuantity;
+        grandTotalAmount += locationTotalAmount;
+        grandTotalSubsidy += locationTotalSubsidy;
+        grandTotalBurden += locationTotalBurden;
+      });
+
+      // 全体合計行
+      csv += `,,${grandTotalOrders},${grandTotalQuantity},${grandTotalAmount},${grandTotalSubsidy},${grandTotalBurden}\n`;
+
+      // レスポンス設定
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="monthly-summary-${year}-${month}.csv"`);
+      res.send(csv);
+    }
+  );
+});
+
+// 月次集計CSVエクスポート（所属ごと・ZIP）
+app.get('/api/orders/export/monthly-csv-separated', (req, res) => {
+  const { year, month } = req.query;
+
+  let startYear = parseInt(year);
+  let startMonth = parseInt(month) - 1;
+  if (startMonth < 1) {
+    startMonth = 12;
+    startYear -= 1;
+  }
+  const startDate = `${startYear}-${String(startMonth).padStart(2, '0')}-16`;
+  const endDate = `${year}-${month}-15`;
+
+  db.all(
+    `SELECT u.name as user_name, u.delivery_location, COUNT(o.id) as order_count, SUM(o.quantity) as total_quantity, SUM(m.price * o.quantity) as total_amount
+     FROM orders o
+     JOIN users u ON o.user_id = u.id
+     JOIN menus m ON o.menu_id = m.id
+     WHERE o.order_date >= ? AND o.order_date <= ?
+     GROUP BY u.id
+     ORDER BY u.delivery_location, u.name`,
+    [startDate, endDate],
+    (err, summary) => {
+      if (err) {
+        return res.status(500).json({ error: 'データベースエラー' });
+      }
+
+      // 所属ごとにグループ化
+      const groupedByLocation = {};
+      summary.forEach(item => {
+        const location = item.delivery_location || '未設定';
+        if (!groupedByLocation[location]) {
+          groupedByLocation[location] = [];
+        }
+        groupedByLocation[location].push(item);
+      });
+
+      // ZIPアーカイブ作成
+      const archive = archiver('zip', { zlib: { level: 9 } });
+
+      res.setHeader('Content-Type', 'application/zip');
+      res.setHeader('Content-Disposition', `attachment; filename="monthly-summary-${year}-${month}.zip"`);
+
+      archive.pipe(res);
+
+      // 各所属のCSVファイルを追加
+      Object.keys(groupedByLocation).sort().forEach(location => {
+        const items = groupedByLocation[location];
+        let csv = '\uFEFF'; // BOM
+        csv += '従業員,注文回数,合計個数,合計金額,補助,負担金額\n';
+
+        // 小計用の変数
+        let totalOrders = 0;
+        let totalQuantity = 0;
+        let totalAmount = 0;
+        let totalSubsidy = 0;
+        let totalBurden = 0;
+
+        items.forEach(item => {
+          const subsidy = item.order_count * 100;
+          const personalBurden = item.total_amount - subsidy;
+          csv += `${item.user_name},${item.order_count},${item.total_quantity},${item.total_amount},${subsidy},${personalBurden}\n`;
+
+          totalOrders += item.order_count;
+          totalQuantity += item.total_quantity;
+          totalAmount += item.total_amount;
+          totalSubsidy += subsidy;
+          totalBurden += personalBurden;
+        });
+
+        // 小計行
+        csv += `小計,${totalOrders},${totalQuantity},${totalAmount},${totalSubsidy},${totalBurden}\n`;
+
+        archive.append(csv, { name: `${location}.csv` });
+      });
+
+      archive.finalize();
+    }
+  );
+});
+
+// 月次集計Excelエクスポート（全所属まとめて・シート分け）
+app.get('/api/orders/export/monthly-excel-combined', (req, res) => {
+  const { year, month } = req.query;
+
+  let startYear = parseInt(year);
+  let startMonth = parseInt(month) - 1;
+  if (startMonth < 1) {
+    startMonth = 12;
+    startYear -= 1;
+  }
+  const startDate = `${startYear}-${String(startMonth).padStart(2, '0')}-16`;
+  const endDate = `${year}-${month}-15`;
+
+  db.all(
+    `SELECT u.name as user_name, u.delivery_location, COUNT(o.id) as order_count, SUM(o.quantity) as total_quantity, SUM(m.price * o.quantity) as total_amount
+     FROM orders o
+     JOIN users u ON o.user_id = u.id
+     JOIN menus m ON o.menu_id = m.id
+     WHERE o.order_date >= ? AND o.order_date <= ?
+     GROUP BY u.id
+     ORDER BY u.delivery_location, u.name`,
+    [startDate, endDate],
+    (err, summary) => {
+      if (err) {
+        return res.status(500).json({ error: 'データベースエラー' });
+      }
+
+      // 所属ごとにグループ化
+      const groupedByLocation = {};
+      summary.forEach(item => {
+        const location = item.delivery_location || '未設定';
+        if (!groupedByLocation[location]) {
+          groupedByLocation[location] = [];
+        }
+        groupedByLocation[location].push(item);
+      });
+
+      // Excelワークブック作成
+      const workbook = xlsx.utils.book_new();
+
+      // 各所属のシートを作成
+      Object.keys(groupedByLocation).sort().forEach(location => {
+        const items = groupedByLocation[location];
+        const data = [
+          ['従業員', '注文回数', '合計個数', '合計金額', '補助', '負担金額']
+        ];
+
+        // 小計用の変数
+        let totalOrders = 0;
+        let totalQuantity = 0;
+        let totalAmount = 0;
+        let totalSubsidy = 0;
+        let totalBurden = 0;
+
+        items.forEach(item => {
+          const subsidy = item.order_count * 100;
+          const personalBurden = item.total_amount - subsidy;
+          data.push([
+            item.user_name,
+            item.order_count,
+            item.total_quantity,
+            item.total_amount,
+            subsidy,
+            personalBurden
+          ]);
+
+          totalOrders += item.order_count;
+          totalQuantity += item.total_quantity;
+          totalAmount += item.total_amount;
+          totalSubsidy += subsidy;
+          totalBurden += personalBurden;
+        });
+
+        // 小計行
+        data.push([
+          '小計',
+          totalOrders,
+          totalQuantity,
+          totalAmount,
+          totalSubsidy,
+          totalBurden
+        ]);
+
+        // シート名は31文字以内にする必要がある
+        const sheetName = location.substring(0, 31);
+        const worksheet = xlsx.utils.aoa_to_sheet(data);
+        xlsx.utils.book_append_sheet(workbook, worksheet, sheetName);
+      });
+
+      // Excelファイルをバッファに書き込み
+      const excelBuffer = xlsx.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="monthly-summary-${year}-${month}.xlsx"`);
+      res.send(excelBuffer);
+    }
+  );
+});
+
+// 月次集計Excelエクスポート（所属ごと・ZIP）
+app.get('/api/orders/export/monthly-excel-separated', (req, res) => {
+  const { year, month } = req.query;
+
+  let startYear = parseInt(year);
+  let startMonth = parseInt(month) - 1;
+  if (startMonth < 1) {
+    startMonth = 12;
+    startYear -= 1;
+  }
+  const startDate = `${startYear}-${String(startMonth).padStart(2, '0')}-16`;
+  const endDate = `${year}-${month}-15`;
+
+  db.all(
+    `SELECT u.name as user_name, u.delivery_location, COUNT(o.id) as order_count, SUM(o.quantity) as total_quantity, SUM(m.price * o.quantity) as total_amount
+     FROM orders o
+     JOIN users u ON o.user_id = u.id
+     JOIN menus m ON o.menu_id = m.id
+     WHERE o.order_date >= ? AND o.order_date <= ?
+     GROUP BY u.id
+     ORDER BY u.delivery_location, u.name`,
+    [startDate, endDate],
+    (err, summary) => {
+      if (err) {
+        return res.status(500).json({ error: 'データベースエラー' });
+      }
+
+      // 所属ごとにグループ化
+      const groupedByLocation = {};
+      summary.forEach(item => {
+        const location = item.delivery_location || '未設定';
+        if (!groupedByLocation[location]) {
+          groupedByLocation[location] = [];
+        }
+        groupedByLocation[location].push(item);
+      });
+
+      // ZIPアーカイブ作成
+      const archive = archiver('zip', { zlib: { level: 9 } });
+
+      res.setHeader('Content-Type', 'application/zip');
+      res.setHeader('Content-Disposition', `attachment; filename="monthly-summary-${year}-${month}.zip"`);
+
+      archive.pipe(res);
+
+      // 各所属のExcelファイルを追加
+      Object.keys(groupedByLocation).sort().forEach(location => {
+        const items = groupedByLocation[location];
+        const data = [
+          ['従業員', '注文回数', '合計個数', '合計金額', '補助', '負担金額']
+        ];
+
+        // 小計用の変数
+        let totalOrders = 0;
+        let totalQuantity = 0;
+        let totalAmount = 0;
+        let totalSubsidy = 0;
+        let totalBurden = 0;
+
+        items.forEach(item => {
+          const subsidy = item.order_count * 100;
+          const personalBurden = item.total_amount - subsidy;
+          data.push([
+            item.user_name,
+            item.order_count,
+            item.total_quantity,
+            item.total_amount,
+            subsidy,
+            personalBurden
+          ]);
+
+          totalOrders += item.order_count;
+          totalQuantity += item.total_quantity;
+          totalAmount += item.total_amount;
+          totalSubsidy += subsidy;
+          totalBurden += personalBurden;
+        });
+
+        // 小計行
+        data.push([
+          '小計',
+          totalOrders,
+          totalQuantity,
+          totalAmount,
+          totalSubsidy,
+          totalBurden
+        ]);
+
+        const workbook = xlsx.utils.book_new();
+        const worksheet = xlsx.utils.aoa_to_sheet(data);
+        xlsx.utils.book_append_sheet(workbook, worksheet, location.substring(0, 31));
+
+        const excelBuffer = xlsx.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+        archive.append(excelBuffer, { name: `${location}.xlsx` });
+      });
+
+      archive.finalize();
     }
   );
 });

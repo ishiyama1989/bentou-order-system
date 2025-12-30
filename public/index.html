@@ -107,8 +107,10 @@
               <h2>予約注文</h2>
               <div class="month-selector">
                 <label>月を選択：</label>
+                <button class="btn btn-secondary btn-sm" onclick="changeOrderMonth(-1)" style="padding: 8px 12px;">◀</button>
                 <select id="order-month-select">
                 </select>
+                <button class="btn btn-secondary btn-sm" onclick="changeOrderMonth(1)" style="padding: 8px 12px;">▶</button>
               </div>
             </div>
             <p style="color: #666; font-size: 14px; margin-top: 10px;">※2ヶ月先まで注文可能です。日替わり弁当550円/1食</p>
@@ -139,7 +141,7 @@
         <div class="tabs">
           <button class="tab-btn active" data-tab="admin-daily">本日の注文</button>
           <button class="tab-btn" data-tab="admin-summary">月次集計</button>
-          <button class="tab-btn" data-tab="admin-menus">メニュー管理</button>
+          <button class="tab-btn" data-tab="admin-menus">管理設定</button>
         </div>
 
         <!-- 本日の注文タブ -->
@@ -149,7 +151,11 @@
               <h2>注文状況</h2>
               <div class="form-group">
                 <label>日付を選択</label>
-                <input type="date" id="admin-daily-date">
+                <div style="display: flex; gap: 8px; align-items: center;">
+                  <button class="btn btn-secondary btn-sm" onclick="changeDailyDate(-1)" style="padding: 8px 12px;">◀</button>
+                  <input type="date" id="admin-daily-date" style="flex: 1;">
+                  <button class="btn btn-secondary btn-sm" onclick="changeDailyDate(1)" style="padding: 8px 12px;">▶</button>
+                </div>
               </div>
               <div class="pdf-export-controls">
                 <button id="download-all-pdf-btn" class="btn btn-success">全配達場所のPDF出力</button>
@@ -163,7 +169,7 @@
 
           <!-- 配達場所別集計サマリー -->
           <div class="card">
-            <h3>配達場所別注文状況</h3>
+            <h3>場所別注文状況</h3>
             <div id="daily-dept-summary"></div>
           </div>
         </div>
@@ -186,37 +192,61 @@
               </select>
               <button id="monthly-summary-btn" class="btn btn-primary">集計</button>
             </div>
+
             <div id="monthly-summary"></div>
           </div>
         </div>
 
         <!-- メニュー管理タブ -->
         <div id="admin-menus-tab" class="tab-content hidden">
-          <h2>メニュー管理</h2>
+          <h2>管理設定</h2>
 
-          <div class="card">
-            <h3>月別メニュー画像設定</h3>
-            <form id="set-monthly-image-form">
-              <div class="form-group">
-                <label>年月を選択</label>
-                <input type="month" id="monthly-image-month" required>
-              </div>
-              <div class="form-group">
-                <label>メニュー画像</label>
-                <div id="monthly-image-dropzone" class="image-dropzone">
-                  <p>ここに画像をドラッグ&ドロップ</p>
-                  <p>または</p>
-                  <input type="file" id="monthly-image-file" accept="image/*" style="display: none;">
-                  <button type="button" class="btn btn-secondary" onclick="document.getElementById('monthly-image-file').click()">ファイルを選択</button>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
+            <!-- 月別メニュー画像設定 -->
+            <div class="card">
+              <h3>月別メニュー画像設定</h3>
+              <form id="set-monthly-image-form">
+                <div class="form-group">
+                  <label>年月を選択</label>
+                  <div style="display: flex; gap: 8px; align-items: center;">
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="changeMonthlyImageMonth(-1)" style="padding: 8px 12px;">◀</button>
+                    <input type="month" id="monthly-image-month" required style="flex: 1;">
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="changeMonthlyImageMonth(1)" style="padding: 8px 12px;">▶</button>
+                  </div>
                 </div>
-                <div id="monthly-image-preview" style="display: none; margin-top: 10px;">
-                  <img id="monthly-preview-img" style="max-width: 200px; border-radius: 4px;">
-                  <p id="monthly-image-filename" style="margin-top: 5px; font-size: 12px; color: #666;"></p>
+                <div class="form-group">
+                  <label>メニュー画像</label>
+                  <div id="monthly-image-dropzone" class="image-dropzone">
+                    <p>ここに画像をドラッグ&ドロップ</p>
+                    <p>または</p>
+                    <input type="file" id="monthly-image-file" accept="image/*" style="display: none;">
+                    <button type="button" class="btn btn-secondary" onclick="document.getElementById('monthly-image-file').click()">ファイルを選択</button>
+                  </div>
+                  <div id="monthly-image-preview" style="display: none; margin-top: 10px;">
+                    <img id="monthly-preview-img" style="max-width: 200px; border-radius: 4px;">
+                    <p id="monthly-image-filename" style="margin-top: 5px; font-size: 12px; color: #666;"></p>
+                  </div>
+                  <input type="hidden" id="monthly-image-url">
                 </div>
-                <input type="hidden" id="monthly-image-url">
+                <button type="submit" class="btn btn-success">画像を設定</button>
+              </form>
+            </div>
+
+            <!-- 注文不可日設定 -->
+            <div class="card">
+              <h3>注文不可日設定</h3>
+              <div class="form-group">
+                <label>月を選択</label>
+                <div style="display: flex; gap: 8px; align-items: center;">
+                  <button class="btn btn-secondary btn-sm" onclick="changeUnavailableMonth(-1)" style="padding: 8px 12px;">◀</button>
+                  <input type="month" id="unavailable-month-select" required style="flex: 1;">
+                  <button class="btn btn-secondary btn-sm" onclick="changeUnavailableMonth(1)" style="padding: 8px 12px;">▶</button>
+                </div>
               </div>
-              <button type="submit" class="btn btn-success">画像を設定</button>
-            </form>
+              <div id="unavailable-calendar" class="unavailable-calendar">
+                <!-- カレンダーがここに表示されます -->
+              </div>
+            </div>
           </div>
 
           <div class="card">

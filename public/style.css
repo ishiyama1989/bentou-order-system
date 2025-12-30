@@ -443,13 +443,16 @@ table tbody tr:hover {
   flex-wrap: wrap;
 }
 
-.date-selector .pdf-export-controls {
-  flex-basis: 100%;
-  margin-top: 10px;
-}
-
 .date-selector h2 {
   margin: 0;
+  order: 1;
+}
+
+.date-selector .pdf-export-controls {
+  flex-basis: 100%;
+  margin-top: 0;
+  margin-bottom: 10px;
+  order: 2;
 }
 
 .date-selector .form-group {
@@ -457,6 +460,8 @@ table tbody tr:hover {
   display: flex;
   align-items: center;
   gap: 10px;
+  order: 3;
+  flex-basis: auto;
 }
 
 .date-selector input[type="date"] {

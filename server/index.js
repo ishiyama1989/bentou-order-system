@@ -50,6 +50,18 @@ app.use(express.static(path.join(__dirname, '..', 'public')));
 
 // =========== 認証API ===========
 
+// デバッグ用：全ユーザー一覧（本番では削除すべき）
+app.get('/api/debug/users', (req, res) => {
+  db.all('SELECT id, name, email, delivery_location, role FROM users', (err, users) => {
+    if (err) {
+      console.error('ユーザー取得エラー:', err);
+      return res.status(500).json({ error: err.message });
+    }
+    console.log('データベース内のユーザー:', users);
+    res.json({ users, count: users.length });
+  });
+});
+
 // ログイン
 app.post('/api/login', (req, res) => {
   const { name, email, password } = req.body;

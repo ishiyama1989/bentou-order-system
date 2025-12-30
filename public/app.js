@@ -1638,9 +1638,9 @@ function renderCalendar(year, month) {
         <span>注文不可</span>
       </div>
     </div>
-    <div style="margin-top: 20px; text-align: center;">
-      <button class="btn btn-success" onclick="applyUnavailableDates()" style="min-width: 200px;">設定を適用</button>
-      <button class="btn btn-secondary" onclick="clearSelection()" style="min-width: 200px; margin-left: 10px;">選択をクリア</button>
+    <div style="margin-top: 20px; display: flex; flex-wrap: wrap; gap: 10px; justify-content: center;">
+      <button class="btn btn-success" onclick="applyUnavailableDates()" style="min-width: 200px; flex: 1; max-width: 250px;">設定を適用</button>
+      <button class="btn btn-secondary" onclick="clearSelection()" style="min-width: 200px; flex: 1; max-width: 250px;">選択をクリア</button>
     </div>
   `;
 

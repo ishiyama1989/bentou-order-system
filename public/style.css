@@ -440,6 +440,12 @@ table tbody tr:hover {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.date-selector .pdf-export-controls {
+  flex-basis: 100%;
+  margin-top: 10px;
 }
 
 .date-selector h2 {

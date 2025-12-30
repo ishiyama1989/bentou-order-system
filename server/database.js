@@ -1,8 +1,23 @@
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
+const fs = require('fs');
 
-const dbPath = path.join(__dirname, '..', 'bentou.db');
-const db = new sqlite3.Database(dbPath);
+// データベースディレクトリを確保
+const dbDir = path.join(__dirname, '..');
+if (!fs.existsSync(dbDir)) {
+  fs.mkdirSync(dbDir, { recursive: true });
+}
+
+const dbPath = path.join(dbDir, 'bentou.db');
+console.log('Database path:', dbPath);
+
+const db = new sqlite3.Database(dbPath, (err) => {
+  if (err) {
+    console.error('データベース接続エラー:', err);
+  } else {
+    console.log('データベースに接続しました');
+  }
+});
 
 // データベース初期化
 db.serialize(() => {

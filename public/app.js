@@ -186,8 +186,14 @@ async function loadTodayOrder() {
         <div class="card today-order-card">
           <h3>${formattedDate}の注文</h3>
           <div class="alert alert-success" style="margin: 20px 0; padding: 20px; background: #d4edda; border: 1px solid #c3e6cb; border-radius: 8px;">
-            <p style="text-align: center; font-size: 18px; margin: 0; color: #155724;">
-              ✓ 注文済み: ${todayOrder.quantity}個
+            <p style="text-align: center; font-size: 18px; margin: 10px 0; color: #155724;">
+              ✓ 注文済み
+            </p>
+            <p style="text-align: center; font-size: 16px; margin: 5px 0; color: #155724;">
+              配達先: ${todayOrder.delivery_location}
+            </p>
+            <p style="text-align: center; font-size: 16px; margin: 5px 0; color: #155724;">
+              数量: ${todayOrder.quantity}個
             </p>
           </div>
           <div class="today-order-content">
@@ -201,6 +207,16 @@ async function loadTodayOrder() {
         <div class="card today-order-card">
           <h3>${formattedDate}の注文</h3>
           <div class="today-order-content">
+            <div class="quantity-selector-large">
+              <label>配達先：</label>
+              <select id="today-delivery-location" class="quantity-select-large">
+                <option value="乗務員区" ${currentUser.delivery_location === '乗務員区' ? 'selected' : ''}>乗務員区</option>
+                <option value="運転指令" ${currentUser.delivery_location === '運転指令' ? 'selected' : ''}>運転指令</option>
+                <option value="管理駅" ${currentUser.delivery_location === '管理駅' ? 'selected' : ''}>管理駅</option>
+                <option value="索道" ${currentUser.delivery_location === '索道' ? 'selected' : ''}>索道</option>
+                <option value="技術所" ${currentUser.delivery_location === '技術所' ? 'selected' : ''}>技術所</option>
+              </select>
+            </div>
             <div class="quantity-selector-large">
               <label>数量：</label>
               <select id="today-quantity" class="quantity-select-large">
@@ -224,6 +240,7 @@ async function loadTodayOrder() {
 // 当日注文の送信
 window.submitTodayOrder = async function() {
   const quantity = parseInt(document.getElementById('today-quantity').value);
+  const deliveryLocation = document.getElementById('today-delivery-location').value;
   const today = new Date().toISOString().split('T')[0];
 
   try {
@@ -236,7 +253,8 @@ window.submitTodayOrder = async function() {
         user_id: currentUser.id,
         menu_id: menuId,
         order_date: today,
-        quantity: quantity
+        quantity: quantity,
+        delivery_location: deliveryLocation
       })
     });
 
@@ -273,7 +291,8 @@ window.cancelTodayOrder = async function() {
         user_id: currentUser.id,
         menu_id: menuId,
         order_date: today,
-        quantity: 0  // 数量0でキャンセル
+        quantity: 0,  // 数量0でキャンセル
+        delivery_location: currentUser.delivery_location
       })
     });
 

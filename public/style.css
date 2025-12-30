@@ -495,7 +495,7 @@ table tbody tr:hover {
   font-size: 14px;
 }
 
-/* PDF出力コントロール */
+/* PDF出力コントロール（デスクトップ：横並び） */
 .pdf-export-controls {
   margin-top: 15px;
   display: flex;

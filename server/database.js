@@ -96,13 +96,15 @@ db.serialize(() => {
   `);
 
   // サンプルデータ挿入（管理者ユーザーの存在を確認）
+  // Renderなどのエフェメラル環境では毎回データベースが初期化される可能性があるため、
+  // テーブル作成後に必ず確認する
   db.get("SELECT * FROM users WHERE email = 'admin@example.com'", (err, admin) => {
     if (err) {
       console.error('ユーザーチェックエラー:', err);
-      return;
+      // エラーでもサンプルデータを挿入してみる（テーブルが空の場合）
     }
 
-    if (!admin) {
+    if (!admin || err) {
       console.log('サンプルデータを挿入します...');
 
       // サンプル配達場所
@@ -112,7 +114,7 @@ db.serialize(() => {
 
       // サンプルユーザー（管理者）
       db.run(`
-        INSERT INTO users (name, email, password, delivery_location, role)
+        INSERT OR IGNORE INTO users (name, email, password, delivery_location, role)
         VALUES ('管理者', 'admin@example.com', '1234', '乗務員区', 'admin')
       `, (err) => {
         if (err) {
@@ -126,7 +128,7 @@ db.serialize(() => {
 
       // 乗務員区
       db.run(`
-        INSERT INTO users (name, email, password, delivery_location, role)
+        INSERT OR IGNORE INTO users (name, email, password, delivery_location, role)
         VALUES ('山田一郎', 'yamada@example.com', '1111', '乗務員区', 'user')
       `, (err) => {
         if (err) console.error('山田一郎挿入エラー:', err);
@@ -135,7 +137,7 @@ db.serialize(() => {
 
       // 運転指令
       db.run(`
-        INSERT INTO users (name, email, password, delivery_location, role)
+        INSERT OR IGNORE INTO users (name, email, password, delivery_location, role)
         VALUES ('田中太郎', 'tanaka@example.com', '5678', '運転指令', 'user')
       `, (err) => {
         if (err) console.error('田中太郎挿入エラー:', err);
@@ -143,7 +145,7 @@ db.serialize(() => {
       });
 
       db.run(`
-        INSERT INTO users (name, email, password, delivery_location, role)
+        INSERT OR IGNORE INTO users (name, email, password, delivery_location, role)
         VALUES ('鈴木次郎', 'suzuki@example.com', '2222', '運転指令', 'user')
       `, (err) => {
         if (err) console.error('鈴木次郎挿入エラー:', err);
@@ -152,7 +154,7 @@ db.serialize(() => {
 
       // 管理駅
       db.run(`
-        INSERT INTO users (name, email, password, delivery_location, role)
+        INSERT OR IGNORE INTO users (name, email, password, delivery_location, role)
         VALUES ('高橋三郎', 'takahashi@example.com', '3333', '管理駅', 'user')
       `, (err) => {
         if (err) console.error('高橋三郎挿入エラー:', err);
@@ -160,7 +162,7 @@ db.serialize(() => {
       });
 
       db.run(`
-        INSERT INTO users (name, email, password, delivery_location, role)
+        INSERT OR IGNORE INTO users (name, email, password, delivery_location, role)
         VALUES ('伊藤四郎', 'ito@example.com', '4444', '管理駅', 'user')
       `, (err) => {
         if (err) console.error('伊藤四郎挿入エラー:', err);
@@ -169,7 +171,7 @@ db.serialize(() => {
 
       // 索道
       db.run(`
-        INSERT INTO users (name, email, password, delivery_location, role)
+        INSERT OR IGNORE INTO users (name, email, password, delivery_location, role)
         VALUES ('渡辺五郎', 'watanabe@example.com', '5555', '索道', 'user')
       `, (err) => {
         if (err) console.error('渡辺五郎挿入エラー:', err);
@@ -177,7 +179,7 @@ db.serialize(() => {
       });
 
       db.run(`
-        INSERT INTO users (name, email, password, delivery_location, role)
+        INSERT OR IGNORE INTO users (name, email, password, delivery_location, role)
         VALUES ('中村六郎', 'nakamura@example.com', '6666', '索道', 'user')
       `, (err) => {
         if (err) console.error('中村六郎挿入エラー:', err);
@@ -186,7 +188,7 @@ db.serialize(() => {
 
       // 技術所
       db.run(`
-        INSERT INTO users (name, email, password, delivery_location, role)
+        INSERT OR IGNORE INTO users (name, email, password, delivery_location, role)
         VALUES ('佐藤花子', 'sato@example.com', '9012', '技術所', 'user')
       `, (err) => {
         if (err) console.error('佐藤花子挿入エラー:', err);
@@ -194,7 +196,7 @@ db.serialize(() => {
       });
 
       db.run(`
-        INSERT INTO users (name, email, password, delivery_location, role)
+        INSERT OR IGNORE INTO users (name, email, password, delivery_location, role)
         VALUES ('小林七郎', 'kobayashi@example.com', '7777', '技術所', 'user')
       `, (err) => {
         if (err) console.error('小林七郎挿入エラー:', err);

@@ -85,28 +85,47 @@ db.serialize(() => {
     )
   `);
 
-  // サンプルデータ挿入
-  db.get("SELECT COUNT(*) as count FROM users", (err, row) => {
-    if (row.count === 0) {
+  // サンプルデータ挿入（管理者ユーザーの存在を確認）
+  db.get("SELECT * FROM users WHERE email = 'admin@example.com'", (err, admin) => {
+    if (err) {
+      console.error('ユーザーチェックエラー:', err);
+      return;
+    }
+
+    if (!admin) {
+      console.log('サンプルデータを挿入します...');
+
       // サンプル配達場所
-      db.run("INSERT INTO delivery_locations (name) VALUES ('乗務員区'), ('大月駅'), ('文大前駅'), ('下吉田駅'), ('富士山駅')");
+      db.run("INSERT OR IGNORE INTO delivery_locations (name) VALUES ('乗務員区'), ('大月駅'), ('文大前駅'), ('下吉田駅'), ('富士山駅')", (err) => {
+        if (err) console.error('配達場所挿入エラー:', err);
+      });
 
       // サンプルユーザー（管理者）
       db.run(`
         INSERT INTO users (name, email, password, delivery_location, role)
         VALUES ('管理者', 'admin@example.com', 'admin123', '乗務員区', 'admin')
-      `);
+      `, (err) => {
+        if (err) {
+          console.error('管理者挿入エラー:', err);
+        } else {
+          console.log('✓ 管理者アカウント作成: 管理者 / admin123');
+        }
+      });
 
       // サンプルユーザー（一般）
       db.run(`
         INSERT INTO users (name, email, password, delivery_location, role)
         VALUES ('田中太郎', 'tanaka@example.com', 'password123', '大月駅', 'user')
-      `);
+      `, (err) => {
+        if (err) console.error('田中太郎挿入エラー:', err);
+      });
 
       db.run(`
         INSERT INTO users (name, email, password, delivery_location, role)
         VALUES ('佐藤花子', 'sato@example.com', 'password123', '富士山駅', 'user')
-      `);
+      `, (err) => {
+        if (err) console.error('佐藤花子挿入エラー:', err);
+      });
 
       // サンプルメニュー（日替わり弁当のみ）
       const today = new Date().toISOString().split('T')[0];
@@ -114,9 +133,13 @@ db.serialize(() => {
       db.run(`
         INSERT INTO menus (name, description, price, available_date)
         VALUES ('日替わり弁当', '本日のおすすめメニュー', 550, '${today}')
-      `);
+      `, (err) => {
+        if (err) console.error('メニュー挿入エラー:', err);
+      });
 
-      console.log('サンプルデータを挿入しました');
+      console.log('✓ サンプルデータの挿入が完了しました');
+    } else {
+      console.log('サンプルデータは既に存在します');
     }
   });
 });

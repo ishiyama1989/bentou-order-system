@@ -84,7 +84,9 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
 document.getElementById('register-form').addEventListener('submit', async (e) => {
   e.preventDefault();
 
-  const name = document.getElementById('register-name').value;
+  const lastName = document.getElementById('register-last-name').value;
+  const firstName = document.getElementById('register-first-name').value;
+  const name = lastName + firstName; // 姓と名を結合
   const password = document.getElementById('register-password').value;
   const department = document.getElementById('register-department').value;
 

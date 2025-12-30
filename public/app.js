@@ -1,4 +1,7 @@
-const API_BASE = 'http://localhost:3000/api';
+// 環境に応じてAPI URLを自動設定
+const API_BASE = window.location.hostname === 'localhost'
+  ? 'http://localhost:3000/api'
+  : '/api';
 
 let currentUser = null;
 

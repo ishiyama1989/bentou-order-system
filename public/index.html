@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>お弁当注文システム</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app">
+    <!-- ログイン画面 -->
+    <div id="login-screen" class="screen">
+      <div class="container">
+        <h1>お弁当注文システム</h1>
+
+        <div class="tabs" style="margin-bottom: 20px;">
+          <button class="tab-btn active" data-tab="login" onclick="switchLoginTab('login')">ログイン</button>
+          <button class="tab-btn" data-tab="register" onclick="switchLoginTab('register')">新規登録</button>
+        </div>
+
+        <!-- ログインフォーム -->
+        <div class="card" id="login-card">
+          <h2>ログイン</h2>
+          <form id="login-form">
+            <div class="form-group">
+              <label>名前</label>
+              <input type="text" id="login-name" required placeholder="山田太郎">
+            </div>
+            <div class="form-group">
+              <label>パスワード</label>
+              <input type="password" id="login-password" required placeholder="パスワード">
+            </div>
+            <button type="submit" class="btn btn-primary">ログイン</button>
+          </form>
+          <div class="test-accounts">
+            <p><strong>テストアカウント:</strong></p>
+            <p>管理者: 管理者 / admin123</p>
+            <p>一般: 田中太郎 / password123</p>
+          </div>
+        </div>
+
+        <!-- 新規登録フォーム -->
+        <div class="card hidden" id="register-card">
+          <h2>新規登録</h2>
+          <form id="register-form">
+            <div class="form-group">
+              <label>名前</label>
+              <input type="text" id="register-name" required placeholder="山田太郎">
+            </div>
+            <div class="form-group">
+              <label>パスワード</label>
+              <input type="password" id="register-password" required placeholder="パスワード（6文字以上）" minlength="6">
+            </div>
+            <div class="form-group">
+              <label>所属</label>
+              <select id="register-department" required>
+                <option value="">選択してください</option>
+                <option value="乗務員区">乗務員区</option>
+                <option value="運転指令">運転指令</option>
+                <option value="管理駅">管理駅</option>
+                <option value="索道">索道</option>
+                <option value="技術所">技術所</option>
+              </select>
+            </div>
+            <button type="submit" class="btn btn-success">登録</button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- ユーザー画面 -->
+    <div id="user-screen" class="screen hidden">
+      <nav class="navbar">
+        <div class="container">
+          <h1>お弁当注文</h1>
+          <div class="nav-right">
+            <span id="user-info"></span>
+            <button id="logout-btn" class="btn btn-secondary">ログアウト</button>
+          </div>
+        </div>
+      </nav>
+
+      <div class="container">
+        <div class="tabs">
+          <button class="tab-btn active" data-tab="today">当日注文</button>
+          <button class="tab-btn" data-tab="reservation">予約注文</button>
+          <button class="tab-btn" data-tab="history">注文履歴</button>
+        </div>
+
+        <!-- 当日注文タブ -->
+        <div id="today-tab" class="tab-content active">
+          <div class="card">
+            <h2>当日注文</h2>
+            <p style="color: #666; font-size: 14px; margin-top: 10px;">※AM8:00まで注文可能です。日替わり弁当550円/1食</p>
+          </div>
+          <div id="today-order"></div>
+        </div>
+
+        <!-- 予約注文タブ -->
+        <div id="reservation-tab" class="tab-content hidden">
+          <div class="card">
+            <div class="order-header">
+              <h2>予約注文</h2>
+              <div class="month-selector">
+                <label>月を選択：</label>
+                <select id="order-month-select">
+                </select>
+              </div>
+            </div>
+            <p style="color: #666; font-size: 14px; margin-top: 10px;">※2ヶ月先まで注文可能です。日替わり弁当550円/1食</p>
+          </div>
+          <div id="menus-list"></div>
+        </div>
+
+        <!-- 注文履歴タブ -->
+        <div id="history-tab" class="tab-content hidden">
+          <div id="order-history"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 管理画面 -->
+    <div id="admin-screen" class="screen hidden">
+      <nav class="navbar">
+        <div class="container">
+          <h1>管理画面</h1>
+          <div class="nav-right">
+            <span id="admin-info"></span>
+            <button id="admin-logout-btn" class="btn btn-secondary">ログアウト</button>
+          </div>
+        </div>
+      </nav>
+
+      <div class="container">
+        <div class="tabs">
+          <button class="tab-btn active" data-tab="admin-daily">本日の注文</button>
+          <button class="tab-btn" data-tab="admin-summary">月次集計</button>
+          <button class="tab-btn" data-tab="admin-menus">メニュー管理</button>
+        </div>
+
+        <!-- 本日の注文タブ -->
+        <div id="admin-daily-tab" class="tab-content active">
+          <div class="card">
+            <div class="date-selector">
+              <h2>注文状況</h2>
+              <div class="form-group">
+                <label>日付を選択</label>
+                <input type="date" id="admin-daily-date">
+              </div>
+              <div style="margin-top: 15px; display: flex; gap: 10px; align-items: center;">
+                <button id="download-all-pdf-btn" class="btn btn-success">全配達場所のPDF出力</button>
+                <select id="delivery-location-select" class="form-control" style="width: 200px;">
+                  <option value="">配達場所を選択</option>
+                </select>
+                <button id="download-location-pdf-btn" class="btn btn-primary">選択した場所のPDF出力</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- 配達場所別集計サマリー -->
+          <div class="card">
+            <h3>配達場所別注文状況</h3>
+            <div id="daily-dept-summary"></div>
+          </div>
+        </div>
+
+        <!-- 月次集計タブ -->
+        <div id="admin-summary-tab" class="tab-content hidden">
+          <div class="card">
+            <h2>月次集計（個人別）</h2>
+            <p style="color: #666; font-size: 14px; margin-bottom: 15px;">
+              ※集計期間：前月16日〜当月15日（例：1月を選択 → 12/16〜1/15）
+            </p>
+            <div class="form-group">
+              <label>年</label>
+              <select id="monthly-year">
+                <option value="">読み込み中...</option>
+              </select>
+              <label>月</label>
+              <select id="monthly-month">
+                <option value="">読み込み中...</option>
+              </select>
+              <button id="monthly-summary-btn" class="btn btn-primary">集計</button>
+            </div>
+            <div id="monthly-summary"></div>
+          </div>
+        </div>
+
+        <!-- メニュー管理タブ -->
+        <div id="admin-menus-tab" class="tab-content hidden">
+          <h2>メニュー管理</h2>
+
+          <div class="card">
+            <h3>月別メニュー画像設定</h3>
+            <form id="set-monthly-image-form">
+              <div class="form-group">
+                <label>年月を選択</label>
+                <input type="month" id="monthly-image-month" required>
+              </div>
+              <div class="form-group">
+                <label>メニュー画像</label>
+                <div id="monthly-image-dropzone" class="image-dropzone">
+                  <p>ここに画像をドラッグ&ドロップ</p>
+                  <p>または</p>
+                  <input type="file" id="monthly-image-file" accept="image/*" style="display: none;">
+                  <button type="button" class="btn btn-secondary" onclick="document.getElementById('monthly-image-file').click()">ファイルを選択</button>
+                </div>
+                <div id="monthly-image-preview" style="display: none; margin-top: 10px;">
+                  <img id="monthly-preview-img" style="max-width: 200px; border-radius: 4px;">
+                  <p id="monthly-image-filename" style="margin-top: 5px; font-size: 12px; color: #666;"></p>
+                </div>
+                <input type="hidden" id="monthly-image-url">
+              </div>
+              <button type="submit" class="btn btn-success">画像を設定</button>
+            </form>
+          </div>
+
+          <div class="card">
+            <h3>新規メニュー追加</h3>
+            <form id="add-menu-form">
+              <div class="form-group">
+                <label>メニュー名</label>
+                <input type="text" id="menu-name" required>
+              </div>
+              <div class="form-group">
+                <label>価格（円）</label>
+                <input type="number" id="menu-price" required min="0">
+              </div>
+              <button type="submit" class="btn btn-primary">メニューを追加</button>
+            </form>
+          </div>
+
+          <div class="card">
+            <h3>登録済みメニュー</h3>
+            <div id="all-menus"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

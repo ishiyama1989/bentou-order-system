@@ -506,13 +506,14 @@ table tbody tr:hover {
   font-size: 14px;
 }
 
-/* PDF出力コントロール（デスクトップ：横並び） */
+/* PDF出力コントロール（デスクトップ：横並び・右詰め） */
 .pdf-export-controls {
   margin-top: 15px;
   display: flex;
   gap: 10px;
   align-items: center;
   flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .pdf-export-controls select {
@@ -936,6 +937,7 @@ table tbody tr:hover {
     flex-direction: column;
     align-items: stretch;
     gap: 12px;
+    justify-content: flex-start;
   }
 
   .pdf-export-controls button,

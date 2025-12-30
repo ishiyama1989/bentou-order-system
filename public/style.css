@@ -936,6 +936,35 @@ table tbody tr:hover {
     min-height: 44px;
   }
 
+  /* フォームのボタンを中央配置 */
+  form {
+    display: flex;
+    flex-direction: column;
+  }
+
+  form button[type="submit"] {
+    align-self: center;
+    min-width: 200px;
+    max-width: 100%;
+    padding: 12px 24px;
+    font-size: 16px;
+    min-height: 44px;
+  }
+
+  /* 月別画像設定フォーム */
+  #set-monthly-image-form button[type="submit"] {
+    align-self: center;
+    width: auto;
+    min-width: 200px;
+  }
+
+  /* メニュー追加フォーム */
+  #add-menu-form button[type="submit"] {
+    align-self: center;
+    width: auto;
+    min-width: 200px;
+  }
+
   /* ログイン画面 */
   #login-screen .container {
     padding: 20px 15px;

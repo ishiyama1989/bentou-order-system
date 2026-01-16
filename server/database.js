@@ -29,6 +29,7 @@ db.serialize(() => {
       email TEXT UNIQUE NOT NULL,
       password TEXT NOT NULL,
       delivery_location TEXT NOT NULL,
+      employment_type TEXT DEFAULT '正社員',
       role TEXT DEFAULT 'user',
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )
@@ -114,8 +115,8 @@ db.serialize(() => {
 
       // サンプルユーザー（管理者）
       db.run(`
-        INSERT OR IGNORE INTO users (name, email, password, delivery_location, role)
-        VALUES ('管理者', 'admin@example.com', '1234', '乗務員区', 'admin')
+        INSERT OR IGNORE INTO users (name, email, password, delivery_location, employment_type, role)
+        VALUES ('管理者', 'admin@example.com', '1234', '乗務員区', '正社員', 'admin')
       `, (err) => {
         if (err) {
           console.error('管理者挿入エラー:', err);
@@ -128,8 +129,8 @@ db.serialize(() => {
 
       // 乗務員区
       db.run(`
-        INSERT OR IGNORE INTO users (name, email, password, delivery_location, role)
-        VALUES ('山田一郎', 'yamada@example.com', '1111', '乗務員区', 'user')
+        INSERT OR IGNORE INTO users (name, email, password, delivery_location, employment_type, role)
+        VALUES ('山田一郎', 'yamada@example.com', '1111', '乗務員区', '正社員', 'user')
       `, (err) => {
         if (err) console.error('山田一郎挿入エラー:', err);
         else console.log('✓ 山田一郎 / 1111 (乗務員区)');
@@ -137,16 +138,16 @@ db.serialize(() => {
 
       // 運転指令
       db.run(`
-        INSERT OR IGNORE INTO users (name, email, password, delivery_location, role)
-        VALUES ('田中太郎', 'tanaka@example.com', '5678', '運転指令', 'user')
+        INSERT OR IGNORE INTO users (name, email, password, delivery_location, employment_type, role)
+        VALUES ('田中太郎', 'tanaka@example.com', '5678', '運転指令', '契約社員', 'user')
       `, (err) => {
         if (err) console.error('田中太郎挿入エラー:', err);
         else console.log('✓ 田中太郎 / 5678 (運転指令)');
       });
 
       db.run(`
-        INSERT OR IGNORE INTO users (name, email, password, delivery_location, role)
-        VALUES ('鈴木次郎', 'suzuki@example.com', '2222', '運転指令', 'user')
+        INSERT OR IGNORE INTO users (name, email, password, delivery_location, employment_type, role)
+        VALUES ('鈴木次郎', 'suzuki@example.com', '2222', '運転指令', 'アルバイト', 'user')
       `, (err) => {
         if (err) console.error('鈴木次郎挿入エラー:', err);
         else console.log('✓ 鈴木次郎 / 2222 (運転指令)');
@@ -154,16 +155,16 @@ db.serialize(() => {
 
       // 管理駅
       db.run(`
-        INSERT OR IGNORE INTO users (name, email, password, delivery_location, role)
-        VALUES ('高橋三郎', 'takahashi@example.com', '3333', '管理駅', 'user')
+        INSERT OR IGNORE INTO users (name, email, password, delivery_location, employment_type, role)
+        VALUES ('高橋三郎', 'takahashi@example.com', '3333', '管理駅', '正社員', 'user')
       `, (err) => {
         if (err) console.error('高橋三郎挿入エラー:', err);
         else console.log('✓ 高橋三郎 / 3333 (管理駅)');
       });
 
       db.run(`
-        INSERT OR IGNORE INTO users (name, email, password, delivery_location, role)
-        VALUES ('伊藤四郎', 'ito@example.com', '4444', '管理駅', 'user')
+        INSERT OR IGNORE INTO users (name, email, password, delivery_location, employment_type, role)
+        VALUES ('伊藤四郎', 'ito@example.com', '4444', '管理駅', '契約社員', 'user')
       `, (err) => {
         if (err) console.error('伊藤四郎挿入エラー:', err);
         else console.log('✓ 伊藤四郎 / 4444 (管理駅)');
@@ -171,16 +172,16 @@ db.serialize(() => {
 
       // 索道
       db.run(`
-        INSERT OR IGNORE INTO users (name, email, password, delivery_location, role)
-        VALUES ('渡辺五郎', 'watanabe@example.com', '5555', '索道', 'user')
+        INSERT OR IGNORE INTO users (name, email, password, delivery_location, employment_type, role)
+        VALUES ('渡辺五郎', 'watanabe@example.com', '5555', '索道', 'アルバイト', 'user')
       `, (err) => {
         if (err) console.error('渡辺五郎挿入エラー:', err);
         else console.log('✓ 渡辺五郎 / 5555 (索道)');
       });
 
       db.run(`
-        INSERT OR IGNORE INTO users (name, email, password, delivery_location, role)
-        VALUES ('中村六郎', 'nakamura@example.com', '6666', '索道', 'user')
+        INSERT OR IGNORE INTO users (name, email, password, delivery_location, employment_type, role)
+        VALUES ('中村六郎', 'nakamura@example.com', '6666', '索道', '正社員', 'user')
       `, (err) => {
         if (err) console.error('中村六郎挿入エラー:', err);
         else console.log('✓ 中村六郎 / 6666 (索道)');
@@ -188,16 +189,16 @@ db.serialize(() => {
 
       // 技術所
       db.run(`
-        INSERT OR IGNORE INTO users (name, email, password, delivery_location, role)
-        VALUES ('佐藤花子', 'sato@example.com', '9012', '技術所', 'user')
+        INSERT OR IGNORE INTO users (name, email, password, delivery_location, employment_type, role)
+        VALUES ('佐藤花子', 'sato@example.com', '9012', '技術所', '契約社員', 'user')
       `, (err) => {
         if (err) console.error('佐藤花子挿入エラー:', err);
         else console.log('✓ 佐藤花子 / 9012 (技術所)');
       });
 
       db.run(`
-        INSERT OR IGNORE INTO users (name, email, password, delivery_location, role)
-        VALUES ('小林七郎', 'kobayashi@example.com', '7777', '技術所', 'user')
+        INSERT OR IGNORE INTO users (name, email, password, delivery_location, employment_type, role)
+        VALUES ('小林七郎', 'kobayashi@example.com', '7777', '技術所', 'アルバイト', 'user')
       `, (err) => {
         if (err) console.error('小林七郎挿入エラー:', err);
         else console.log('✓ 小林七郎 / 7777 (技術所)');

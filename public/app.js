@@ -98,9 +98,15 @@ document.getElementById('register-form').addEventListener('submit', async (e) =>
   const name = lastName + firstName; // 姓と名を結合
   const password = document.getElementById('register-password').value;
   const department = document.getElementById('register-department').value;
+  const employmentType = document.getElementById('register-employment-type').value;
 
   if (!department) {
     alert('所属を選択してください');
+    return;
+  }
+
+  if (!employmentType) {
+    alert('雇用形態を選択してください');
     return;
   }
 
@@ -108,7 +114,7 @@ document.getElementById('register-form').addEventListener('submit', async (e) =>
     const response = await fetch(`${API_BASE}/users/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, password, delivery_location: department })
+      body: JSON.stringify({ name, password, delivery_location: department, employment_type: employmentType })
     });
 
     const data = await response.json();
@@ -746,8 +752,8 @@ async function loadOrderHistory(year = null, month = null) {
     const totalAmount = filteredOrders.reduce((sum, order) => sum + (order.price * order.quantity), 0);
     // 注文した日数（個数ではなく日数）
     const totalDays = filteredOrders.length;
-    // 会社補助：1日あたり100円
-    const totalSubsidy = totalDays * 100;
+    // 会社補助：1日あたり100円（アルバイトは補助なし）
+    const totalSubsidy = currentUser.employment_type === 'アルバイト' ? 0 : totalDays * 100;
     // 自己負担額
     const selfPayment = totalAmount - totalSubsidy;
 
@@ -775,11 +781,12 @@ async function loadOrderHistory(year = null, month = null) {
         `<table>
           <thead>
             <tr>
-              <th style="width: 20%;">日付</th>
-              <th style="width: 15%;">曜日</th>
-              <th style="width: 15%;">個数</th>
-              <th style="width: 25%;">金額</th>
-              <th style="width: 25%;">補助</th>
+              <th style="width: 15%;">日付</th>
+              <th style="width: 10%;">曜日</th>
+              <th style="width: 25%;">配達場所</th>
+              <th style="width: 10%;">個数</th>
+              <th style="width: 20%;">金額</th>
+              <th style="width: 20%;">補助</th>
             </tr>
           </thead>
           <tbody>
@@ -788,24 +795,26 @@ async function loadOrderHistory(year = null, month = null) {
               const day = date.getDate();
               const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
               const weekday = weekdays[date.getDay()];
+              const subsidy = currentUser.employment_type === 'アルバイト' ? 0 : 100;
               return `
               <tr>
                 <td>${day}日</td>
                 <td>${weekday}</td>
+                <td>${order.delivery_location || currentUser.delivery_location}</td>
                 <td>${order.quantity}</td>
                 <td>¥${order.price * order.quantity}</td>
-                <td>¥100</td>
+                <td>¥${subsidy}</td>
               </tr>
             `;
             }).join('')}
             <tr style="background: #f0f0f0; font-weight: bold;">
-              <td colspan="2">合計</td>
+              <td colspan="3">合計</td>
               <td>${totalQuantity}</td>
               <td>¥${totalAmount}</td>
               <td>¥${totalSubsidy}</td>
             </tr>
             <tr style="background: #e3f2fd; font-weight: bold; color: #1976d2;">
-              <td colspan="4" style="text-align: right; padding-right: 4px;">自己負担額</td>
+              <td colspan="5" style="text-align: right; padding-right: 4px;">自己負担額</td>
               <td>¥${selfPayment}</td>
             </tr>
           </tbody>
@@ -1106,7 +1115,7 @@ document.getElementById('monthly-summary-btn').addEventListener('click', async (
       let locationTotalBurden = 0;
 
       const rowsHTML = items.map(item => {
-        const subsidy = item.order_count * 100;
+        const subsidy = item.employment_type === 'アルバイト' ? 0 : item.order_count * 100;
         const personalBurden = item.total_amount - subsidy;
 
         locationTotalOrders += item.order_count;

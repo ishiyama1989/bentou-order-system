@@ -79,7 +79,7 @@ app.post('/api/login', (req, res) => {
         return res.status(401).json({ error: '名前またはパスワードが間違っています' });
       }
       console.log('ログイン成功:', user.name);
-      res.json({ user: { id: user.id, name: user.name, email: user.email, delivery_location: user.delivery_location, role: user.role } });
+      res.json({ user: { id: user.id, name: user.name, email: user.email, delivery_location: user.delivery_location, employment_type: user.employment_type, role: user.role } });
     }
   );
 });
@@ -88,10 +88,10 @@ app.post('/api/login', (req, res) => {
 
 // ユーザー登録
 app.post('/api/users/register', (req, res) => {
-  const { name, password, delivery_location } = req.body;
+  const { name, password, delivery_location, employment_type } = req.body;
 
   // バリデーション
-  if (!name || !password || !delivery_location) {
+  if (!name || !password || !delivery_location || !employment_type) {
     return res.status(400).json({ error: '全ての項目を入力してください' });
   }
 
@@ -115,8 +115,8 @@ app.post('/api/users/register', (req, res) => {
 
     // ユーザーを登録
     db.run(
-      'INSERT INTO users (name, email, password, delivery_location, role) VALUES (?, ?, ?, ?, ?)',
-      [name, email, password, delivery_location, 'user'],
+      'INSERT INTO users (name, email, password, delivery_location, employment_type, role) VALUES (?, ?, ?, ?, ?, ?)',
+      [name, email, password, delivery_location, employment_type, 'user'],
       function(err) {
         if (err) {
           return res.status(500).json({ error: 'データベースエラー' });
@@ -133,7 +133,7 @@ app.post('/api/users/register', (req, res) => {
 
 // 全ユーザー取得
 app.get('/api/users', (req, res) => {
-  db.all('SELECT id, name, email, delivery_location, role FROM users', (err, users) => {
+  db.all('SELECT id, name, email, delivery_location, employment_type, role FROM users', (err, users) => {
     if (err) {
       return res.status(500).json({ error: 'データベースエラー' });
     }
@@ -456,7 +456,7 @@ app.get('/api/orders/summary/monthly', (req, res) => {
   const endDate = `${year}-${month}-15`;
 
   db.all(
-    `SELECT u.name as user_name, u.delivery_location, COUNT(o.id) as order_count, SUM(o.quantity) as total_quantity, SUM(m.price * o.quantity) as total_amount
+    `SELECT u.name as user_name, u.delivery_location, u.employment_type, COUNT(o.id) as order_count, SUM(o.quantity) as total_quantity, SUM(m.price * o.quantity) as total_amount
      FROM orders o
      JOIN users u ON o.user_id = u.id
      JOIN menus m ON o.menu_id = m.id
@@ -872,7 +872,7 @@ app.get('/api/orders/export/monthly-csv-single', (req, res) => {
   const endDate = `${year}-${month}-15`;
 
   db.all(
-    `SELECT u.name as user_name, u.delivery_location, COUNT(o.id) as order_count, SUM(o.quantity) as total_quantity, SUM(m.price * o.quantity) as total_amount
+    `SELECT u.name as user_name, u.delivery_location, u.employment_type, COUNT(o.id) as order_count, SUM(o.quantity) as total_quantity, SUM(m.price * o.quantity) as total_amount
      FROM orders o
      JOIN users u ON o.user_id = u.id
      JOIN menus m ON o.menu_id = m.id
@@ -898,7 +898,7 @@ app.get('/api/orders/export/monthly-csv-single', (req, res) => {
 
       // データ行
       summary.forEach(item => {
-        const subsidy = item.order_count * 100;
+        const subsidy = item.employment_type === 'アルバイト' ? 0 : item.order_count * 100;
         const personalBurden = item.total_amount - subsidy;
         csv += `${item.user_name},${item.order_count},${item.total_quantity},${item.total_amount},${subsidy},${personalBurden}\n`;
 
@@ -934,7 +934,7 @@ app.get('/api/orders/export/monthly-excel-single', (req, res) => {
   const endDate = `${year}-${month}-15`;
 
   db.all(
-    `SELECT u.name as user_name, u.delivery_location, COUNT(o.id) as order_count, SUM(o.quantity) as total_quantity, SUM(m.price * o.quantity) as total_amount
+    `SELECT u.name as user_name, u.delivery_location, u.employment_type, COUNT(o.id) as order_count, SUM(o.quantity) as total_quantity, SUM(m.price * o.quantity) as total_amount
      FROM orders o
      JOIN users u ON o.user_id = u.id
      JOIN menus m ON o.menu_id = m.id
@@ -959,7 +959,7 @@ app.get('/api/orders/export/monthly-excel-single', (req, res) => {
       let totalBurden = 0;
 
       summary.forEach(item => {
-        const subsidy = item.order_count * 100;
+        const subsidy = item.employment_type === 'アルバイト' ? 0 : item.order_count * 100;
         const personalBurden = item.total_amount - subsidy;
         data.push([
           item.user_name,
@@ -1015,7 +1015,7 @@ app.get('/api/orders/export/monthly-csv-combined', (req, res) => {
   const endDate = `${year}-${month}-15`;
 
   db.all(
-    `SELECT u.name as user_name, u.delivery_location, COUNT(o.id) as order_count, SUM(o.quantity) as total_quantity, SUM(m.price * o.quantity) as total_amount
+    `SELECT u.name as user_name, u.delivery_location, u.employment_type, COUNT(o.id) as order_count, SUM(o.quantity) as total_quantity, SUM(m.price * o.quantity) as total_amount
      FROM orders o
      JOIN users u ON o.user_id = u.id
      JOIN menus m ON o.menu_id = m.id
@@ -1105,7 +1105,7 @@ app.get('/api/orders/export/monthly-csv-separated', (req, res) => {
   const endDate = `${year}-${month}-15`;
 
   db.all(
-    `SELECT u.name as user_name, u.delivery_location, COUNT(o.id) as order_count, SUM(o.quantity) as total_quantity, SUM(m.price * o.quantity) as total_amount
+    `SELECT u.name as user_name, u.delivery_location, u.employment_type, COUNT(o.id) as order_count, SUM(o.quantity) as total_quantity, SUM(m.price * o.quantity) as total_amount
      FROM orders o
      JOIN users u ON o.user_id = u.id
      JOIN menus m ON o.menu_id = m.id
@@ -1186,7 +1186,7 @@ app.get('/api/orders/export/monthly-excel-combined', (req, res) => {
   const endDate = `${year}-${month}-15`;
 
   db.all(
-    `SELECT u.name as user_name, u.delivery_location, COUNT(o.id) as order_count, SUM(o.quantity) as total_quantity, SUM(m.price * o.quantity) as total_amount
+    `SELECT u.name as user_name, u.delivery_location, u.employment_type, COUNT(o.id) as order_count, SUM(o.quantity) as total_quantity, SUM(m.price * o.quantity) as total_amount
      FROM orders o
      JOIN users u ON o.user_id = u.id
      JOIN menus m ON o.menu_id = m.id
@@ -1285,7 +1285,7 @@ app.get('/api/orders/export/monthly-excel-separated', (req, res) => {
   const endDate = `${year}-${month}-15`;
 
   db.all(
-    `SELECT u.name as user_name, u.delivery_location, COUNT(o.id) as order_count, SUM(o.quantity) as total_quantity, SUM(m.price * o.quantity) as total_amount
+    `SELECT u.name as user_name, u.delivery_location, u.employment_type, COUNT(o.id) as order_count, SUM(o.quantity) as total_quantity, SUM(m.price * o.quantity) as total_amount
      FROM orders o
      JOIN users u ON o.user_id = u.id
      JOIN menus m ON o.menu_id = m.id

@@ -108,7 +108,7 @@ db.serialize(() => {
       console.log('サンプルデータを挿入します...');
 
       // サンプル配達場所
-      db.run("INSERT OR IGNORE INTO delivery_locations (name) VALUES ('乗務員区'), ('大月駅'), ('文大前駅'), ('下吉田駅'), ('富士山駅')", (err) => {
+      db.run("INSERT OR IGNORE INTO delivery_locations (name) VALUES ('乗務員区'), ('運転指令'), ('管理駅'), ('索道'), ('技術所')", (err) => {
         if (err) console.error('配達場所挿入エラー:', err);
       });
 

@@ -138,6 +138,15 @@ body {
   background: #c0392b;
 }
 
+.btn-info {
+  background: #17a2b8;
+  color: white;
+}
+
+.btn-info:hover {
+  background: #138496;
+}
+
 /* タブ */
 .tabs {
   display: flex;
@@ -457,6 +466,7 @@ table tbody tr:hover {
 
 .date-selector .form-group {
   margin: 0;
+  margin-top: -62px;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -464,10 +474,27 @@ table tbody tr:hover {
   flex-basis: auto;
 }
 
+.date-selector .form-group > div {
+  align-items: center;
+}
+
 .date-selector input[type="date"] {
   width: auto;
-  padding: 8px 12px;
+  padding: 0 12px;
   font-size: 16px;
+  height: 42px;
+  line-height: 42px;
+  box-sizing: border-box;
+}
+
+.date-selector .btn-sm {
+  height: 42px;
+  padding: 0 12px !important;
+  line-height: 42px;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* 注文ヘッダー（月選択） */
@@ -516,14 +543,30 @@ table tbody tr:hover {
   justify-content: flex-end;
 }
 
+/* 日付選択のラベル分のスペースを確保して中心を揃える */
+.date-selector .pdf-export-controls {
+  padding-top: 38px;
+}
+
 .pdf-export-controls select {
   min-width: 200px;
   flex: 0 0 auto;
+  height: 42px;
+  padding: 0 12px;
+  line-height: 42px;
+  box-sizing: border-box;
 }
 
 .pdf-export-controls button {
   flex: 0 0 auto;
   white-space: nowrap;
+  height: 42px;
+  padding: 0 20px;
+  line-height: 42px;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* 注文不可行 */
@@ -917,7 +960,24 @@ table tbody tr:hover {
   .order-header {
     flex-direction: column;
     gap: 15px;
-    align-items: flex-start;
+    align-items: center;
+  }
+
+  /* スマホでは日付選択を上に */
+  .date-selector .form-group {
+    order: 2;
+    width: 100%;
+    margin-top: 0;
+  }
+
+  .date-selector .form-group > div {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .date-selector .pdf-export-controls {
+    order: 3;
+    width: 100%;
   }
 
   .month-selector {
@@ -938,6 +998,10 @@ table tbody tr:hover {
     align-items: stretch;
     gap: 12px;
     justify-content: flex-start;
+  }
+
+  .date-selector .pdf-export-controls {
+    padding-top: 0;
   }
 
   .pdf-export-controls button,

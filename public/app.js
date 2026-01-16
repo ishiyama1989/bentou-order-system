@@ -259,9 +259,11 @@ async function loadTodayOrder() {
             <div class="quantity-selector-large">
               <label>配達先：</label>
               <select id="today-delivery-location" class="quantity-select-large">
-                <option value="乗務員区" ${currentUser.delivery_location === '乗務員区' ? 'selected' : ''}>乗務員区</option>
-                <option value="運転指令" ${currentUser.delivery_location === '運転指令' ? 'selected' : ''}>運転指令</option>
-                <option value="管理駅" ${currentUser.delivery_location === '管理駅' ? 'selected' : ''}>管理駅</option>
+                <option value="河口湖駅（乗務員区）" ${currentUser.delivery_location === '河口湖駅（乗務員区）' ? 'selected' : ''}>河口湖駅（乗務員区）</option>
+                <option value="富士山駅" ${currentUser.delivery_location === '富士山駅' ? 'selected' : ''}>富士山駅</option>
+                <option value="下吉田駅" ${currentUser.delivery_location === '下吉田駅' ? 'selected' : ''}>下吉田駅</option>
+                <option value="文大前駅" ${currentUser.delivery_location === '文大前駅' ? 'selected' : ''}>文大前駅</option>
+                <option value="大月駅" ${currentUser.delivery_location === '大月駅' ? 'selected' : ''}>大月駅</option>
                 <option value="索道" ${currentUser.delivery_location === '索道' ? 'selected' : ''}>索道</option>
                 <option value="技術所" ${currentUser.delivery_location === '技術所' ? 'selected' : ''}>技術所</option>
               </select>
@@ -519,11 +521,13 @@ async function loadMonthlyMenus(year, month) {
               <td>
                 <select id="location-${dateStr}" class="location-select">
                   <option value="">選択してください</option>
-                  <option value="乗務員区">乗務員区</option>
-                  <option value="大月駅">大月駅</option>
-                  <option value="文大前駅">文大前駅</option>
-                  <option value="下吉田駅">下吉田駅</option>
+                  <option value="河口湖駅（乗務員区）">河口湖駅（乗務員区）</option>
                   <option value="富士山駅">富士山駅</option>
+                  <option value="下吉田駅">下吉田駅</option>
+                  <option value="文大前駅">文大前駅</option>
+                  <option value="大月駅">大月駅</option>
+                  <option value="索道">索道</option>
+                  <option value="技術所">技術所</option>
                 </select>
               </td>
               <td>
@@ -606,7 +610,7 @@ window.updateReservationOrder = async function(dateStr) {
       if (quantity === 0) {
         alert('注文をキャンセルしました');
       } else {
-        alert(`${quantity}個で予約しました！`);
+        alert(`${quantity}個で予約しました！\n配達場所: ${deliveryLocation}`);
       }
       // 現在選択されている年月を取得してメニューをリロード
       const select = document.getElementById('order-month-select');
@@ -1719,6 +1723,558 @@ window.applyUnavailableDates = async function() {
     alert('エラーが発生しました');
   }
 };
+
+// ========== お弁当屋さん用画面 ==========
+
+// お弁当屋さん画面を表示
+window.showBentoShopScreen = function() {
+  showScreen('bentoshop-screen');
+
+  // 本日の日付を設定
+  const today = new Date().toISOString().split('T')[0];
+  document.getElementById('bentoshop-date').value = today;
+
+  // 本日の注文を読み込み
+  loadBentoShopOrders(today);
+};
+
+// お弁当屋さん用日付変更
+window.changeBentoShopDate = function(offset) {
+  const dateInput = document.getElementById('bentoshop-date');
+  const currentDate = new Date(dateInput.value);
+  currentDate.setDate(currentDate.getDate() + offset);
+  const newValue = currentDate.toISOString().split('T')[0];
+  dateInput.value = newValue;
+  loadBentoShopOrders(newValue);
+};
+
+// お弁当屋さん用注文データ読み込み
+async function loadBentoShopOrders(date) {
+  try {
+    // 配達場所別集計を取得
+    const deptResponse = await fetch(`${API_BASE}/orders/summary/department?date=${date}`);
+    const deptSummary = await deptResponse.json();
+
+    // 配達場所一覧を取得（PDF用）
+    const locationsResponse = await fetch(`${API_BASE}/delivery-locations/${date}`);
+    const locations = await locationsResponse.json();
+
+    // 配達場所セレクトボックスを更新
+    const locationSelect = document.getElementById('bentoshop-location-select');
+    locationSelect.innerHTML = '<option value="">配達場所を選択</option>' +
+      locations.map(loc => `<option value="${loc}">${loc}</option>`).join('');
+
+    // お弁当屋さん用：配達場所を集約する
+    // 河口湖駅（乗務員区）、大月駅、文大前駅 → 河口湖駅
+    const aggregatedData = {};
+
+    deptSummary.forEach(item => {
+      let location = item.delivery_location || '未設定';
+
+      // 配達場所の変換
+      if (location === '河口湖駅（乗務員区）' || location === '大月駅' || location === '文大前駅') {
+        location = '河口湖駅';
+      }
+
+      // 同じ配達場所のデータを集約
+      if (!aggregatedData[location]) {
+        aggregatedData[location] = {
+          delivery_location: location,
+          user_count: 0,
+          total_quantity: 0,
+          total_amount: 0
+        };
+      }
+
+      aggregatedData[location].user_count += item.user_count;
+      aggregatedData[location].total_quantity += item.total_quantity;
+      aggregatedData[location].total_amount += item.total_amount;
+    });
+
+    // オブジェクトを配列に変換
+    const aggregatedSummary = Object.values(aggregatedData);
+
+    // 配達場所別集計を表示
+    const deptDiv = document.getElementById('bentoshop-dept-summary');
+    if (aggregatedSummary.length === 0) {
+      deptDiv.innerHTML = '<div class="empty-state"><p>この日の注文はありません</p></div>';
+    } else {
+      const totalQuantity = aggregatedSummary.reduce((sum, item) => sum + item.total_quantity, 0);
+      const totalPeople = aggregatedSummary.reduce((sum, item) => sum + item.user_count, 0);
+      const totalAmount = aggregatedSummary.reduce((sum, item) => sum + item.total_amount, 0);
+
+      deptDiv.innerHTML = `
+        <table>
+          <thead>
+            <tr>
+              <th style="text-align: center;">配達場所</th>
+              <th style="text-align: center;">注文者数</th>
+              <th style="text-align: center;">合計個数</th>
+              <th style="text-align: center;">合計金額</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${aggregatedSummary.map(item => `
+              <tr>
+                <td style="text-align: center;">${item.delivery_location}</td>
+                <td style="text-align: center;">${item.user_count}名</td>
+                <td style="text-align: center; font-weight: bold; font-size: 1.1em;">${item.total_quantity}個</td>
+                <td style="text-align: right;">¥${item.total_amount.toLocaleString()}</td>
+              </tr>
+            `).join('')}
+            <tr style="font-weight: bold; background: #f0f0f0;">
+              <td style="text-align: center;">合計</td>
+              <td style="text-align: center;">${totalPeople}名</td>
+              <td style="text-align: center; font-size: 1.2em;">${totalQuantity}個</td>
+              <td style="text-align: right;">¥${totalAmount.toLocaleString()}</td>
+            </tr>
+          </tbody>
+        </table>
+      `;
+    }
+  } catch (error) {
+    console.error('Error loading bento shop orders:', error);
+  }
+}
+
+// ========== お弁当屋さん用設定機能 ==========
+
+// お弁当屋さん用 - 注文不可日の配列
+let bentoShopUnavailableDates = [];
+// お弁当屋さん用 - 選択中の日付の配列
+let bentoShopSelectedDates = [];
+
+// お弁当屋さん用 - 月別メニュー画像の月を変更
+window.changeBentoShopMonthlyImageMonth = function(delta) {
+  const input = document.getElementById('bentoshop-monthly-image-month');
+  if (!input || !input.value) return;
+
+  const [currentYear, currentMonth] = input.value.split('-').map(Number);
+  const currentDate = new Date(currentYear, currentMonth - 1, 1);
+
+  // 新しい月を計算
+  currentDate.setMonth(currentDate.getMonth() + delta);
+  const newYear = currentDate.getFullYear();
+  const newMonth = currentDate.getMonth() + 1;
+
+  // 新しい値を設定
+  const newValue = `${newYear}-${String(newMonth).padStart(2, '0')}`;
+  input.value = newValue;
+};
+
+// お弁当屋さん用 - 注文不可日設定の月を変更
+window.changeBentoShopUnavailableMonth = function(delta) {
+  const bentoShopUnavailableMonthSelect = document.getElementById('bentoshop-unavailable-month-select');
+  if (!bentoShopUnavailableMonthSelect || !bentoShopUnavailableMonthSelect.value) return;
+
+  const [currentYear, currentMonth] = bentoShopUnavailableMonthSelect.value.split('-').map(Number);
+  const currentDate = new Date(currentYear, currentMonth - 1, 1);
+
+  // 新しい月を計算
+  currentDate.setMonth(currentDate.getMonth() + delta);
+  const newYear = currentDate.getFullYear();
+  const newMonth = currentDate.getMonth() + 1;
+
+  // 新しい値を設定
+  const newValue = `${newYear}-${String(newMonth).padStart(2, '0')}`;
+  bentoShopUnavailableMonthSelect.value = newValue;
+
+  // 選択をクリア
+  bentoShopSelectedDates = [];
+
+  // カレンダーを再読み込み
+  loadBentoShopUnavailableCalendar();
+};
+
+// お弁当屋さん用 - カレンダーを読み込む
+async function loadBentoShopUnavailableCalendar() {
+  const bentoShopUnavailableMonthSelect = document.getElementById('bentoshop-unavailable-month-select');
+  const monthValue = bentoShopUnavailableMonthSelect.value;
+  if (!monthValue) return;
+
+  const [year, month] = monthValue.split('-');
+
+  try {
+    // その月の注文不可日を取得
+    const response = await fetch(`${API_BASE}/admin/unavailable-dates/${year}/${month}`);
+    bentoShopUnavailableDates = await response.json();
+
+    // カレンダーを描画
+    renderBentoShopCalendar(parseInt(year), parseInt(month));
+  } catch (error) {
+    console.error('Error loading unavailable dates:', error);
+  }
+}
+
+// お弁当屋さん用 - カレンダーを描画
+function renderBentoShopCalendar(year, month) {
+  const calendarDiv = document.getElementById('bentoshop-unavailable-calendar');
+
+  // その月の1日
+  const firstDay = new Date(year, month - 1, 1);
+  // その月の最終日
+  const lastDay = new Date(year, month, 0);
+  const daysInMonth = lastDay.getDate();
+
+  // 1日が何曜日か（0=日曜, 1=月曜, ...）
+  const firstDayOfWeek = firstDay.getDay();
+
+  // 今日の日付
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  let html = '<div class="calendar-grid">';
+
+  // 曜日ヘッダー
+  const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
+  weekdays.forEach(day => {
+    html += `<div class="calendar-day-header">${day}</div>`;
+  });
+
+  // 空白セル（月初めまで）
+  for (let i = 0; i < firstDayOfWeek; i++) {
+    html += '<div class="calendar-day empty"></div>';
+  }
+
+  // 日付セル
+  for (let day = 1; day <= daysInMonth; day++) {
+    const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    const currentDate = new Date(year, month - 1, day);
+
+    // 過去の日付かチェック
+    const isPast = currentDate < today;
+
+    // 注文不可日かチェック
+    const isUnavailable = bentoShopUnavailableDates.some(d => d.unavailable_date === dateStr);
+
+    // 選択中かチェック
+    const isSelected = bentoShopSelectedDates.includes(dateStr);
+
+    let classes = 'calendar-day';
+    if (isPast) {
+      classes += ' past';
+    } else if (isSelected) {
+      classes += ' selected';
+    } else if (isUnavailable) {
+      classes += ' unavailable';
+    }
+
+    html += `<div class="${classes}" data-date="${dateStr}" onclick="selectBentoShopDate('${dateStr}', ${isPast})">${day}</div>`;
+  }
+
+  html += '</div>';
+
+  // 凡例と設定ボタン
+  html += `
+    <div class="calendar-legend">
+      <div class="calendar-legend-item">
+        <div class="calendar-legend-box available"></div>
+        <span>注文可能</span>
+      </div>
+      <div class="calendar-legend-item">
+        <div class="calendar-legend-box" style="background: #cfe2ff; border-color: #3498db;"></div>
+        <span>選択中</span>
+      </div>
+      <div class="calendar-legend-item">
+        <div class="calendar-legend-box unavailable"></div>
+        <span>注文不可</span>
+      </div>
+    </div>
+    <div style="margin-top: 20px; display: flex; flex-wrap: wrap; gap: 10px; justify-content: center;">
+      <button class="btn btn-success" onclick="applyBentoShopUnavailableDates()" style="min-width: 200px; flex: 1; max-width: 250px;">設定を適用</button>
+      <button class="btn btn-secondary" onclick="clearBentoShopSelection()" style="min-width: 200px; flex: 1; max-width: 250px;">選択をクリア</button>
+    </div>
+  `;
+
+  calendarDiv.innerHTML = html;
+}
+
+// お弁当屋さん用 - 日付を選択
+window.selectBentoShopDate = function(dateStr, isPast) {
+  // 過去の日付は選択不可
+  if (isPast) {
+    alert('過去の日付は変更できません');
+    return;
+  }
+
+  // 既に選択されている場合は選択解除
+  const index = bentoShopSelectedDates.indexOf(dateStr);
+  if (index > -1) {
+    bentoShopSelectedDates.splice(index, 1);
+  } else {
+    // 選択されていない場合は選択
+    bentoShopSelectedDates.push(dateStr);
+  }
+
+  // カレンダーを再描画
+  const bentoShopUnavailableMonthSelect = document.getElementById('bentoshop-unavailable-month-select');
+  const monthValue = bentoShopUnavailableMonthSelect.value;
+  const [year, month] = monthValue.split('-');
+  renderBentoShopCalendar(parseInt(year), parseInt(month));
+};
+
+// お弁当屋さん用 - 選択をクリア
+window.clearBentoShopSelection = function() {
+  bentoShopSelectedDates = [];
+  const bentoShopUnavailableMonthSelect = document.getElementById('bentoshop-unavailable-month-select');
+  const monthValue = bentoShopUnavailableMonthSelect.value;
+  const [year, month] = monthValue.split('-');
+  renderBentoShopCalendar(parseInt(year), parseInt(month));
+};
+
+// お弁当屋さん用 - 設定を適用
+window.applyBentoShopUnavailableDates = async function() {
+  if (bentoShopSelectedDates.length === 0) {
+    alert('日付が選択されていません');
+    return;
+  }
+
+  try {
+    // 各選択された日付に対して処理
+    const promises = bentoShopSelectedDates.map(async (dateStr) => {
+      const isCurrentlyUnavailable = bentoShopUnavailableDates.some(d => d.unavailable_date === dateStr);
+
+      if (isCurrentlyUnavailable) {
+        // 注文不可日を削除（注文可能に戻す）
+        return fetch(`${API_BASE}/admin/unavailable-dates/${dateStr}`, {
+          method: 'DELETE'
+        });
+      } else {
+        // 注文不可日に設定
+        return fetch(`${API_BASE}/admin/unavailable-dates`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ date: dateStr, reason: null })
+        });
+      }
+    });
+
+    await Promise.all(promises);
+
+    // 選択をクリア
+    bentoShopSelectedDates = [];
+
+    // カレンダーを再読み込み
+    await loadBentoShopUnavailableCalendar();
+
+    alert('設定を適用しました');
+  } catch (error) {
+    console.error('Error applying unavailable dates:', error);
+    alert('エラーが発生しました');
+  }
+};
+
+// お弁当屋さん画面の日付変更イベント
+document.addEventListener('DOMContentLoaded', () => {
+  const bentoShopDateInput = document.getElementById('bentoshop-date');
+  if (bentoShopDateInput) {
+    bentoShopDateInput.addEventListener('change', (e) => {
+      loadBentoShopOrders(e.target.value);
+    });
+  }
+
+  // 戻るボタン
+  const bentoShopBackBtn = document.getElementById('bentoshop-back-btn');
+  if (bentoShopBackBtn) {
+    bentoShopBackBtn.addEventListener('click', () => {
+      showScreen('login-screen');
+    });
+  }
+
+  // 全配達場所PDF出力
+  const bentoShopDownloadAllPdfBtn = document.getElementById('bentoshop-download-all-pdf-btn');
+  if (bentoShopDownloadAllPdfBtn) {
+    bentoShopDownloadAllPdfBtn.addEventListener('click', () => {
+      const date = document.getElementById('bentoshop-date').value;
+      if (!date) {
+        alert('日付を選択してください');
+        return;
+      }
+      window.open(`${API_BASE}/orders/pdf/${date}`, '_blank');
+    });
+  }
+
+  // 選択した場所のPDF出力
+  const bentoShopDownloadLocationPdfBtn = document.getElementById('bentoshop-download-location-pdf-btn');
+  if (bentoShopDownloadLocationPdfBtn) {
+    bentoShopDownloadLocationPdfBtn.addEventListener('click', () => {
+      const date = document.getElementById('bentoshop-date').value;
+      const location = document.getElementById('bentoshop-location-select').value;
+
+      if (!date) {
+        alert('日付を選択してください');
+        return;
+      }
+
+      if (!location) {
+        alert('配達場所を選択してください');
+        return;
+      }
+
+      window.open(`${API_BASE}/orders/pdf/${date}/${encodeURIComponent(location)}`, '_blank');
+    });
+  }
+
+  // ========== お弁当屋さん用 - 画像アップロード ==========
+
+  // 月別メニュー画像月選択のデフォルト値を設定
+  const bentoShopMonthlyImageMonthInput = document.getElementById('bentoshop-monthly-image-month');
+  if (bentoShopMonthlyImageMonthInput) {
+    const now = new Date();
+    const defaultMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    bentoShopMonthlyImageMonthInput.value = defaultMonth;
+  }
+
+  // 月別画像のドラッグ&ドロップとファイル選択
+  const bentoShopMonthlyDropzone = document.getElementById('bentoshop-monthly-image-dropzone');
+  const bentoShopMonthlyFileInput = document.getElementById('bentoshop-monthly-image-file');
+  const bentoShopMonthlyPreview = document.getElementById('bentoshop-monthly-image-preview');
+  const bentoShopMonthlyPreviewImg = document.getElementById('bentoshop-monthly-preview-img');
+  const bentoShopMonthlyFilename = document.getElementById('bentoshop-monthly-image-filename');
+  const bentoShopMonthlyImageUrl = document.getElementById('bentoshop-monthly-image-url');
+
+  if (bentoShopMonthlyDropzone && bentoShopMonthlyFileInput) {
+    // ドラッグ&ドロップイベント
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+      bentoShopMonthlyDropzone.addEventListener(eventName, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      }, false);
+    });
+
+    ['dragenter', 'dragover'].forEach(eventName => {
+      bentoShopMonthlyDropzone.addEventListener(eventName, () => {
+        bentoShopMonthlyDropzone.classList.add('highlight');
+      });
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+      bentoShopMonthlyDropzone.addEventListener(eventName, () => {
+        bentoShopMonthlyDropzone.classList.remove('highlight');
+      });
+    });
+
+    bentoShopMonthlyDropzone.addEventListener('drop', (e) => {
+      const dt = e.dataTransfer;
+      const files = dt.files;
+      handleBentoShopMonthlyImageFiles(files);
+    });
+
+    // ファイル選択イベント
+    bentoShopMonthlyFileInput.addEventListener('change', (e) => {
+      handleBentoShopMonthlyImageFiles(e.target.files);
+    });
+  }
+
+  // 画像ファイル処理
+  async function handleBentoShopMonthlyImageFiles(files) {
+    if (files.length === 0) return;
+
+    const file = files[0];
+
+    // 画像ファイルチェック
+    if (!file.type.startsWith('image/')) {
+      alert('画像ファイルを選択してください');
+      return;
+    }
+
+    // プレビュー表示
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      bentoShopMonthlyPreviewImg.src = e.target.result;
+      bentoShopMonthlyFilename.textContent = file.name;
+      bentoShopMonthlyPreview.style.display = 'block';
+    };
+    reader.readAsDataURL(file);
+
+    // サーバーにアップロード
+    const formData = new FormData();
+    formData.append('image', file);
+
+    try {
+      const response = await fetch(`${API_BASE}/upload-image`, {
+        method: 'POST',
+        body: formData
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        bentoShopMonthlyImageUrl.value = data.imageUrl;
+        console.log('画像アップロード成功:', data.imageUrl);
+      } else {
+        alert(data.error || '画像アップロードに失敗しました');
+      }
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      alert('画像アップロードエラーが発生しました');
+    }
+  }
+
+  // 月別画像設定フォーム
+  const bentoShopSetMonthlyImageForm = document.getElementById('bentoshop-set-monthly-image-form');
+  if (bentoShopSetMonthlyImageForm) {
+    bentoShopSetMonthlyImageForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const imageUrl = bentoShopMonthlyImageUrl.value;
+      if (!imageUrl) {
+        alert('画像を選択してください');
+        return;
+      }
+
+      const monthValue = bentoShopMonthlyImageMonthInput.value; // "2025-01" 形式
+      const [year, month] = monthValue.split('-');
+
+      const imageData = {
+        year: parseInt(year),
+        month: parseInt(month),
+        image_url: imageUrl
+      };
+
+      try {
+        const response = await fetch(`${API_BASE}/monthly-images`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(imageData)
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+          alert(`${month}月の画像を設定しました！`);
+          bentoShopSetMonthlyImageForm.reset();
+          bentoShopMonthlyPreview.style.display = 'none';
+          bentoShopMonthlyImageUrl.value = '';
+        } else {
+          alert(data.error || '画像設定に失敗しました');
+        }
+      } catch (error) {
+        console.error('Error setting monthly image:', error);
+        alert('画像設定エラーが発生しました');
+      }
+    });
+  }
+
+  // ========== お弁当屋さん用 - 注文不可日カレンダー ==========
+
+  // 注文不可日月選択の初期化
+  const bentoShopUnavailableMonthSelect = document.getElementById('bentoshop-unavailable-month-select');
+  if (bentoShopUnavailableMonthSelect) {
+    // デフォルトは今月
+    const now = new Date();
+    const defaultMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    bentoShopUnavailableMonthSelect.value = defaultMonth;
+
+    // 月変更時にカレンダーを更新
+    bentoShopUnavailableMonthSelect.addEventListener('change', async () => {
+      await loadBentoShopUnavailableCalendar();
+    });
+
+    // 初期表示
+    loadBentoShopUnavailableCalendar();
+  }
+});
 
 // 初期化
 setupTabs();
